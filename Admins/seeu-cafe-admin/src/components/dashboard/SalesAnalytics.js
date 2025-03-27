@@ -12,10 +12,10 @@ const data = [
 
 const SalesAnalytics = () => {
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="bg-white p-6 rounded-lg shadow font-['Phetsarath_OT']">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Sales Analytics</h2>
-        <a href="#" className="text-brown-500 text-sm">See all</a>
+        <h2 className="text-xl font-semibold">ການວິເຄາະການຂາຍ</h2>
+        <a href="#" className="text-brown-500 text-sm">ເບີ່ງທັງໝົດ</a>
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>

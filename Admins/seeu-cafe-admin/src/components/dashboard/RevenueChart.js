@@ -14,15 +14,15 @@ const data = [
 
 const RevenueChart = () => {
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">Revenue</h2>
+    <div className="bg-white p-6 rounded-lg shadow font-['Phetsarath_OT']">
+      <h2 className="text-xl font-semibold mb-4">ລາຍໄດ້</h2>
       <div className="flex justify-between mb-4">
         <div>
-          <p className="text-sm text-gray-500">Income</p>
+          <p className="text-sm text-gray-500">ຍອດຮັບ</p>
           <p className="text-2xl font-bold">$561,623</p>
         </div>
         <div>
-          <p className="text-sm text-gray-500">Expense</p>
+          <p className="text-sm text-gray-500">ຄ່າໃຊ້ຈ່າຍ</p>
           <p className="text-2xl font-bold">$126,621</p>
         </div>
       </div>

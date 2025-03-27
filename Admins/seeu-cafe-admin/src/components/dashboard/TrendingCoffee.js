@@ -12,10 +12,10 @@ const coffeeData = [
 
 const TrendingCoffee = () => {
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="bg-white p-6 rounded-lg shadow font-['Phetsarath_OT']">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Trending Coffee</h2>
-        <a href="#" className="text-brown-500 text-sm">See all</a>
+        <h2 className="text-xl font-semibold">ກາແຟທີ່ໄດ້ຮັບຄວາມນິຍົມ</h2>
+        <a href="#" className="text-brown-500 text-sm">ເບີ່ງທັງໝົດ</a>
       </div>
       <div className="space-y-4">
         {coffeeData.map((coffee, index) => (

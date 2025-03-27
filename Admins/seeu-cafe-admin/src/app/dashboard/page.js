@@ -5,13 +5,12 @@ import DashboardStats from '@/components/dashboard/DashboardStats';
 import SalesAnalytics from '@/components/dashboard/SalesAnalytics';
 import TrendingCoffee from '@/components/dashboard/TrendingCoffee';
 import RecentOrders from '@/components/dashboard/RecentOrders';
+import CustomerMap from '@/components/dashboard/CustomerMap';
+import RevenueChart from '@/components/dashboard/RevenueChart';
 
 const Dashboard = () => {
     return (
-      <Layout>
-        <h2 className="my-6 text-2xl font-semibold text-gray-700">
-          Dashboard
-        </h2>
+      <Layout >
         
         <DashboardStats />
         
@@ -24,6 +23,19 @@ const Dashboard = () => {
           </div>
         </div>
         
+        <div className="container mx-auto p-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Revenue Chart</h2>
+          <RevenueChart />
+        </div>
+
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Customer Map</h2>
+          <CustomerMap />
+        </div>
+      </div>
+    </div>
         <div className="mt-8">
           <RecentOrders />
         </div>

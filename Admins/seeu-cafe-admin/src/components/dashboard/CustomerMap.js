@@ -14,12 +14,12 @@ const data = [
 
 const CustomerMap = () => {
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">Customer Map</h2>
+    <div className="bg-white p-6 rounded-lg shadow font-['Phetsarath_OT']">
+      <h2 className="text-xl font-semibold mb-4">ແຜນພາບຂອງລູກຄ້າ</h2>
       <div className="flex justify-end space-x-2 mb-4">
-        <button className="px-3 py-1 bg-gray-800 text-white rounded">Monthly</button>
-        <button className="px-3 py-1 bg-gray-200 text-gray-800 rounded">Weekly</button>
-        <button className="px-3 py-1 bg-gray-200 text-gray-800 rounded">Today</button>
+        <button className="px-3 py-1 bg-gray-800 text-white rounded">ລາຍເດືອນ</button>
+        <button className="px-3 py-1 bg-gray-200 text-gray-800 rounded">ລາຍອາທິດ</button>
+        <button className="px-3 py-1 bg-gray-200 text-gray-800 rounded">ມື້ນີ້</button>
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
