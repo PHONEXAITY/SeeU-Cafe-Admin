@@ -1,165 +1,275 @@
+'use client'
+
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { FaBars, FaBell, FaUserCircle, FaCog, FaSignOutAlt, FaSearch, FaShoppingCart, FaCoffee } from 'react-icons/fa';
+import { notificationService } from '@/services/api';
+import Image from 'next/image';
+import Link from 'next/link';
 
 const Header = ({ sidebarOpen, setSidebarOpen }) => {
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const profileRef = useRef(null);
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const notificationRef = useRef(null);
+  const profileRef = useRef(null);
 
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const { data } = await notificationService.getNotifications();
+        setNotifications(data.notifications);
+        setUnreadCount(data.notifications.filter(notification => !notification.read).length);
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+    
+    // Setup notification polling (every 1 minute)
+    const intervalId = setInterval(fetchNotifications, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Handle clicks outside of dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setIsProfileMenuOpen(false);
-      }
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setIsNotificationOpen(false);
+        setShowNotificationDropdown(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileDropdown(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  return (
-    <header className="z-20 py-4 bg-white shadow-md font-['Phetsarath_OT']">
-      <div className="container flex items-center justify-between h-full px-6 mx-auto text-brown-600">
+  // Mark notification as read
+  const handleNotificationClick = async (id) => {
+    try {
+      await notificationService.markAsRead(id);
+      setNotifications(notifications.map(notification => 
+        notification.id === id ? { ...notification, read: true } : notification
+      ));
+      setUnreadCount(prev => prev - 1);
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
 
-        <button
-          className="p-1 mr-5 -ml-1 rounded-md lg:hidden focus:outline-none focus:shadow-outline-brown"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          aria-label="Menu"
-        >
-          <FaBars className="w-6 h-6" />
-        </button>
-        
-        <div className="flex justify-center flex-1 lg:mr-32">
-          <div className="relative w-full max-w-xl mr-6 focus-within:text-brown-500">
-            <div className="absolute inset-y-0 flex items-center pl-2">
-              <FaSearch className="w-4 h-4" aria-hidden="true" />
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      setNotifications(notifications.map(notification => ({
+        ...notification,
+        read: true
+      })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  return (
+    <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Left: Hamburger and Search */}
+          <div className="flex items-center">
+            <button
+              type="button"
+              className="text-gray-500 hover:text-gray-600 lg:hidden focus:outline-none"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <span className="sr-only">Open sidebar</span>
+              <FaBars className="w-6 h-6" />
+            </button>
+            
+            <div className="hidden sm:block ml-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaSearch className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:border-brown-500 focus:ring-1 focus:ring-brown-500 sm:text-sm"
+                />
+              </div>
             </div>
-            <input
-              className="w-full pl-8 py-2 pr-2 text-sm text-gray-700 placeholder-gray-600 bg-gray-100 border-0 rounded-xl dark:placeholder-gray-500 dark:focus:shadow-outline-gray dark:focus:placeholder-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:placeholder-gray-500 focus:bg-white focus:border-brown-300 focus:outline-none focus:shadow-outline-brown form-input"
-              type="text"
-              placeholder="ຄົ້ນຫາການຕັ້ງຄ່າທີ່ຕ້ອງການ"
-              aria-label="Search"
-            />
+          </div>
+          
+          {/* Center: Brand */}
+          <div className="hidden md:flex md:items-center">
+            <Link href="/dashboard">
+              <div className="flex items-center cursor-pointer">
+                <FaCoffee className="h-8 w-8 text-brown-600 mr-2" />
+                <span className="text-xl font-bold text-brown-800">SeeU Cafe Admin</span>
+              </div>
+            </Link>
+          </div>
+          
+          {/* Right: Notifications and Profile */}
+          <div className="flex items-center space-x-4">
+            {/* Notifications */}
+            <div className="relative" ref={notificationRef}>
+              <button
+                type="button"
+                className="relative p-1 text-gray-500 hover:bg-gray-100 rounded-full focus:outline-none"
+                onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+              >
+                <span className="sr-only">View notifications</span>
+                <FaBell className="h-6 w-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              
+              {/* Notification dropdown */}
+              {showNotificationDropdown && (
+                <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <div className="py-1">
+                    <div className="px-4 py-2 border-b border-gray-200 flex justify-between items-center">
+                      <h3 className="text-sm font-medium text-gray-700">Notifications</h3>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-xs text-brown-600 hover:text-brown-800"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center">
+                        <p className="text-gray-500 text-sm">No notifications</p>
+                      </div>
+                    ) : (
+                      <div className="max-h-60 overflow-y-auto">
+                        {notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`px-4 py-2 hover:bg-gray-50 cursor-pointer ${
+                              !notification.read ? 'bg-blue-50' : ''
+                            }`}
+                            onClick={() => handleNotificationClick(notification.id)}
+                          >
+                            <div className="flex items-start">
+                              <div className="flex-shrink-0">
+                                {/* Icon based on notification type */}
+                                {notification.type === 'order' && (
+                                  <FaShoppingCart className="h-5 w-5 text-brown-600" />
+                                )}
+                                {notification.type === 'user' && (
+                                  <FaUserCircle className="h-5 w-5 text-blue-600" />
+                                )}
+                                {/* Add more types as needed */}
+                              </div>
+                              <div className="ml-3 w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {notification.title}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {notification.message}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-400">
+                                  {new Date(notification.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {notifications.length > 0 && (
+                      <div className="px-4 py-2 border-t border-gray-200 text-center">
+                        <Link
+                          href="/notifications"
+                          className="text-sm text-brown-600 hover:text-brown-800"
+                          onClick={() => setShowNotificationDropdown(false)}
+                        >
+                          View all notifications
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Profile */}
+            <div className="relative" ref={profileRef}>
+              <button
+                type="button"
+                className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brown-500"
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+              >
+                <span className="sr-only">Open user menu</span>
+                <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border border-gray-300">
+                  {user?.avatar ? (
+                    <Image
+                      src={user.avatar}
+                      alt="Profile"
+                      width={32}
+                      height={32}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <FaUserCircle className="h-7 w-7 text-gray-400" />
+                  )}
+                </div>
+                <span className="ml-2 text-gray-700 hidden md:block">
+                  {user?.name || 'Administrator'}
+                </span>
+              </button>
+              
+              {/* Profile dropdown */}
+              {showProfileDropdown && (
+                <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <div className="py-1">
+                    <Link
+                      href="/profile"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileDropdown(false)}
+                    >
+                      <FaUserCircle className="mr-3 h-4 w-4 text-gray-400" />
+                      Your Profile
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileDropdown(false)}
+                    >
+                      <FaCog className="mr-3 h-4 w-4 text-gray-400" />
+                      Settings
+                    </Link>
+                    <button
+                      onClick={logout}
+                      className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <FaSignOutAlt className="mr-3 h-4 w-4 text-gray-400" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        <ul className="flex items-center flex-shrink-0 space-x-6">
-          {/* Quick order button */}
-          <li className="flex">
-            <button
-              className="rounded-md focus:outline-none focus:shadow-outline-brown"
-              aria-label="Quick Order"
-            >
-              <FaCoffee className="w-5 h-5" />
-            </button>
-          </li>
-          {/* Shopping cart */}
-          <li className="flex">
-            <button
-              className="rounded-md focus:outline-none focus:shadow-outline-brown"
-              aria-label="Shopping Cart"
-            >
-              <FaShoppingCart className="w-5 h-5" />
-            </button>
-          </li>
-          {/* Notifications menu */}
-          <li className="relative" ref={notificationRef}>
-            <button
-              className="relative align-middle rounded-md focus:outline-none focus:shadow-outline-brown"
-              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-              aria-label="Notifications"
-              aria-haspopup="true"
-            >
-              <FaBell className="w-5 h-5" />
-              <span
-                aria-hidden="true"
-                className="absolute top-0 right-0 inline-block w-3 h-3 transform translate-x-1 -translate-y-1 bg-red-600 border-2 border-white rounded-full"
-              ></span>
-            </button>
-            {isNotificationOpen && (
-              <ul
-                className="absolute right-0 w-56 p-2 mt-2 space-y-2 text-gray-600 bg-white border border-gray-100 rounded-md shadow-md"
-                aria-label="submenu"
-              >
-                <li className="flex">
-                  <a
-                    className="inline-flex items-center justify-between w-full px-2 py-1 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-gray-100 hover:text-gray-800"
-                    href="#"
-                  >
-                    <span>ໄດ້ຮັບການສັ່ງຊື້ໃໝ່</span>
-                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-600 bg-red-100 rounded-full">
-                      New
-                    </span>
-                  </a>
-                </li>
-                <li className="flex">
-                  <a
-                    className="inline-flex items-center justify-between w-full px-2 py-1 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-gray-100 hover:text-gray-800"
-                    href="#"
-                  >
-                    <span>ສິນຄ້າໝົດໃນສະຕ໊ອກແລ້ວ</span>
-                  </a>
-                </li>
-              </ul>
-            )}
-          </li>
-          {/* Profile menu */}
-          <li className="relative" ref={profileRef}>
-            <button
-              className="align-middle rounded-full focus:shadow-outline-brown focus:outline-none"
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              aria-label="Account"
-              aria-haspopup="true"
-            >
-              <img
-                className="object-cover w-8 h-8 rounded-full"
-                src="https://images.unsplash.com/photo-1502378735452-bc7d86632805?ixlib=rb-0.3.5&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=200&fit=max&s=aa3a807e1bbdfd4364d1f449eaa96d82"
-                alt=""
-                aria-hidden="true"
-              />
-            </button>
-            {isProfileMenuOpen && (
-              <ul
-                className="absolute right-0 w-56 p-2 mt-2 space-y-2 text-gray-600 bg-white border border-gray-100 rounded-md shadow-md"
-                aria-label="submenu"
-              >
-                <li className="flex">
-                  <a
-                    className="inline-flex items-center w-full px-2 py-1 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-gray-100 hover:text-gray-800"
-                    href="#"
-                  >
-                    <FaUserCircle className="w-4 h-4 mr-3" />
-                    <span>ໂປຣໄຟລ໌</span>
-                  </a>
-                </li>
-                <li className="flex">
-                  <a
-                    className="inline-flex items-center w-full px-2 py-1 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-gray-100 hover:text-gray-800"
-                    href="#"
-                  >
-                    <FaCog className="w-4 h-4 mr-3" />
-                    <span>ການຕັ້ງຄ່າ</span>
-                  </a>
-                </li>
-                <li className="flex">
-                  <a
-                    className="inline-flex items-center w-full px-2 py-1 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-gray-100 hover:text-gray-800"
-                    href="#"
-                  >
-                    <FaSignOutAlt className="w-4 h-4 mr-3" />
-                    <span>Log out</span>
-                  </a>
-                </li>
-              </ul>
-            )}
-          </li>
-        </ul>
       </div>
     </header>
   );

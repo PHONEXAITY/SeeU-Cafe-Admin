@@ -1,251 +1,243 @@
+'use client'
+
 import React, { useState, useEffect } from 'react';
-import ReportDialog from '../Reports/ReportDialog.jsx';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
-  FaHome, FaShoppingCart, FaUsers, FaBox, FaTruck, FaStar, 
-  FaChartBar, FaBell, FaCog, FaClipboardList, FaUserCircle, 
-  FaChevronDown, FaChevronRight, FaBlog, FaPercent, FaImages,
-  FaPlayCircle, FaBars, FaUserTie
+  FaTimes, FaHome, FaShoppingBag, FaShoppingCart, FaUsers, 
+  FaTruck, FaChartBar, FaComments, FaBell, FaCog, FaUserFriends,
+  FaBlog, FaPercent, FaImages, FaThLarge, FaCreditCard, FaBoxOpen
 } from 'react-icons/fa';
+import Image from 'next/image';
 
-const MenuItem = ({ icon, text, subItems, href }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <li className="relative px-6 py-3 font-['Phetsarath_OT']">
-       <a href={href} className="w-full">
-      <button
-        className="inline-flex items-center justify-between w-full text-sm font-semibold transition-colors duration-150 hover:text-brown-600"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span className="inline-flex items-center">
-          {icon}
-          <span className="ml-4">{text}</span>
-        </span>
-        {subItems && (
-          isOpen ? <FaChevronDown className="w-4 h-4" /> : <FaChevronRight className="w-4 h-4" />
-        )}
-      </button>
-      </a>
-      {subItems && isOpen && (
-        <ul className="p-2 mt-2 space-y-2 overflow-hidden text-sm font-medium text-gray-500 rounded-md shadow-inner bg-beige-50">
-          {subItems.map((item, index) => (
-            <li key={index} className="px-2 py-1 transition-colors duration-150 hover:text-brown-600">
-              <a className="w-full" href={item.href}>
-                {item.text}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-};
-
-const Sidebar = ({ isOpen, setIsOpen }) => {
+const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
+  const pathname = usePathname();
+  const { user, hasRole } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
-  const [showReportDialog, setShowReportDialog] = useState(false);
 
+  // Check if screen is mobile
   useEffect(() => {
-    const checkIsMobile = () => {
+    const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
     };
     
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
+    handleResize();
+    window.addEventListener('resize', handleResize);
     
-    return () => window.removeEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [pathname, isMobile, setSidebarOpen]);
+
   const menuItems = [
-    { 
-      icon: <FaHome className="w-5 h-5" />, 
-      text: "Dashboard",
-      href: "/dashboard"
-    },,
-    { 
-      icon: <FaShoppingCart className="w-5 h-5" />, 
-      text: "ການສັ່ງຊື້", 
-      subItems: [
-        { href: "/Orders/list", text: "ລາຍການສັ່ງຊື້" },
-        { href: "/Orders/create", text: "ສ້າງລາຍການສັ່ງຊື້ໃໝ່" },
-        { href: "/Orders/history", text: "ປະຫວັດການສັ່ງຊື້" },
-      ]
+    {
+      title: 'Dashboard',
+      icon: <FaHome className="w-5 h-5" />,
+      href: '/dashboard',
+      roleRequired: null, // Everyone can access
     },
-    { 
-      icon: <FaUsers className="w-5 h-5" />, 
-      text: "ຜູ້ໃຊ້ລະບົບ",
-      subItems: [
-        { href: "/users/list", text: "ລາຍຊື່ຜູ້ໃຊ້ລະບົບ" },
-        { href: "/users/create", text: "ສ້າງຜູ້ໃຊ້ໃໝ່" },
-        { href: "/users/roles", text: "ຕຳແໜ່ງຂອງຜູ້ໃຊ້" },
-      ]
+    {
+      title: 'Products',
+      icon: <FaShoppingBag className="w-5 h-5" />,
+      href: '/products',
+      roleRequired: 'admin', // Only admin and above can access
     },
-    { 
-      icon: <FaBox className="w-5 h-5" />, 
-      text: "ສິນຄ້າ",
-      subItems: [
-        { href: "/products/list", text: "ລາຍການສິນຄ້າ" },
-        { href: "/products/categories", text: "ປະເພດສິນຄ້າ" },
-      ]
+    {
+      title: 'Categories',
+      icon: <FaBoxOpen className="w-5 h-5" />,
+      href: '/categories',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaTruck className="w-5 h-5" />, 
-      text: "ການຈັດສົ່ງ",
-      subItems: [
-        { href: "/shipping/orders", text: "ການຈັດສົ່ງລາຍການສັ່ງຊື້" },
-        { href: "/shipping/tracking", text: "ການຕິດຕາມ" },
-        { href: "/shipping/carriers", text: "ຜູ້ໃຫ້ບໍລິການ" },
-      ]
+    {
+      title: 'Orders',
+      icon: <FaShoppingCart className="w-5 h-5" />,
+      href: '/orders',
+      roleRequired: 'staff', // Staff and above can access
     },
-    { 
-      icon: <FaUserTie className="w-5 h-5" />, 
-      text: "ຈັດການພະນັກງານ",
-      subItems: [
-        { href: "/employees/list", text: "ລາຍຊື່ພະນັກງານ" },
-        { href: "/employees/create", text: "ເພີ່ມພະນັກງານໃໝ່" },
-        { href: "/employees/schedule", text: "ຕາຕະລາງເຮັດວຽກ" },
-        { href: "/employees/attendance", text: "ການຂາດ, ລາ, ມາສາຍ" },
-      ]
+    {
+      title: 'Users',
+      icon: <FaUsers className="w-5 h-5" />,
+      href: '/users',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaStar className="w-5 h-5" />, 
-      text: "Reviews",
-      subItems: [
-        { href: "/reviews/list", text: "Review List" },
-        { href: "/reviews/moderate", text: "Moderate Reviews" },
-      ]
+    {
+      title: 'Shipping',
+      icon: <FaTruck className="w-5 h-5" />,
+      href: '/shipping',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaChartBar className="w-5 h-5" />, 
-      text: "ການວິເຄາະ",
-      subItems: [
-        { href: "/analytics/sales", text: "ການວິເຄາະການຂາຍ" },
-        { href: "/analytics/users", text: "ການວິເຄາະຜູ້ໃຊ້" },
-        { href: "/analytics/products", text: "ການວິເຄາະສິນຄ້າ" },
-      ]
+    {
+      title: 'Analytics',
+      icon: <FaChartBar className="w-5 h-5" />,
+      href: '/analytics',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaBell className="w-5 h-5" />, 
-      text: "ການແຈ້ງເຕືອນ",
-      subItems: [
-        { href: "/notifications/all", text: "ການແຈ້ງເຕືອນທັງໝົດ" },
-      ]
+    {
+      title: 'Reviews',
+      icon: <FaComments className="w-5 h-5" />,
+      href: '/reviews',
+      roleRequired: 'staff',
     },
-    { 
-      icon: <FaClipboardList className="w-5 h-5" />, 
-      text: "CRM",
-      subItems: [
-        { href: "/crm/campaigns", text: "Campaigns" },
-        { href: "/crm/customer-list", text: "ລາຍຊື່ລູກຄ້າ" },
-        { href: "/crm/segments", text: "ກຸ່ມລູກຄ້າ" },
-      ]
+    {
+      title: 'Notifications',
+      icon: <FaBell className="w-5 h-5" />,
+      href: '/notifications',
+      roleRequired: 'staff',
     },
-    { 
-      icon: <FaUserCircle className="w-5 h-5" />, 
-      text: "ປະສົບການຂອງຜູ້ໃຊ້",
-      subItems: [
-        { href: "/ux/feedback", text: "ຄຳຕິຊົມຂອງຜູ້ໃຊ້" },
-      ]
+    {
+      title: 'Customers',
+      icon: <FaUserFriends className="w-5 h-5" />,
+      href: '/customers',
+      roleRequired: 'staff',
     },
-    { 
-      icon: <FaBlog className="w-5 h-5" />, 
-      text: "Blog",
-      subItems: [
-        { href: "/blog/posts", text: "Posts ທັງໝົດ" },
-        { href: "/blog/create", text: "ສ້າງ Post ໃໝ່" },
-        { href: "/blog/categories", text: "ໝວດໝູ່" },
-        { href: "/blog/comments", text: "ຄວາມຄິດເຫັນ" },
-      ]
+    {
+      title: 'Blog',
+      icon: <FaBlog className="w-5 h-5" />,
+      href: '/blog',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaPercent className="w-5 h-5" />, 
-      text: "Promotions",
-      subItems: [
-        { href: "/promotions/active", text: "Promotions ທີ່ໃຊ້ງານຢູ່" },
-        { href: "/promotions/create", text: "ສ້າງ Promotion ໃໝ່" },
-        { href: "/promotions/history", text: "ປະຫວັດ Promotion" },
-      ]
+    {
+      title: 'Promotions',
+      icon: <FaPercent className="w-5 h-5" />,
+      href: '/promotions',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaPlayCircle className="w-5 h-5" />, 
-      text: "Slideshow",
-      subItems: [
-        { href: "/slideshow/list", text: "Slides ທັງໝົດ" },
-        { href: "/slideshow/create", text: "ສ້າງ Slide ໃໝ່" },
-        { href: "/slideshow/settings", text: "ການຕັ້ງຄ່າ Slideshow" },
-      ]
+    {
+      title: 'Slideshow',
+      icon: <FaImages className="w-5 h-5" />,
+      href: '/slideshow',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaImages className="w-5 h-5" />, 
-      text: "ຄັງຮູບພາບ",
-      subItems: [
-        { href: "/gallery/all", text: "ຮູບພາບທັງໝົດ" },
-        { href: "/gallery/upload", text: "ອັບໂຫລດ ຮູບພາບ" },
-        { href: "/gallery/albums", text: "Albums" },
-      ]
+    {
+      title: 'Gallery',
+      icon: <FaThLarge className="w-5 h-5" />,
+      href: '/gallery',
+      roleRequired: 'admin',
     },
-    { 
-      icon: <FaCog className="w-5 h-5" />, 
-      text: "ການຕັ້ງຄ່າ",
-      subItems: [
-        { href: "/settings/general", text: "ການຕັ້ງຄ່າ ທົ່ວໄປ" },
-        { href: "/settings/security", text: "ຄວາມປອດໄພຂອງລະບົບ" },
-        { href: "/settings/integrations", text: "ການຮັກສາລະບົບ" },
-      ]
+    {
+      title: 'Payment',
+      icon: <FaCreditCard className="w-5 h-5" />,
+      href: '/payment',
+      roleRequired: 'admin',
+    },
+    {
+      title: 'Settings',
+      icon: <FaCog className="w-5 h-5" />,
+      href: '/settings',
+      roleRequired: 'admin',
     },
   ];
 
+  // Filter menu items based on user role
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!item.roleRequired) return true;
+    return hasRole(item.roleRequired);
+  });
+
   return (
     <>
-      <aside 
-        className={`
-          fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto bg-white dark:bg-gray-800 
-          transition-all duration-300 ease-in-out transform 
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:static lg:inset-0
-        `}
-      >
-        <div className="py-4 text-gray-500 dark:text-gray-400 font-['Phetsarath_OT']">
-          <div className="ml-6 flex items-center justify-between">
-          <a href="/dashboard">
-            <img src='/logo (2).jpg' alt='Coffee Shop Logo' className="w-auto h-16 sm:h-20 md:h-24 lg:h-28 object-contain" />
-            </a>
-            <button
-              className="p-1 mr-5 -ml-1 rounded-md lg:hidden focus:outline-none focus:shadow-outline-brown"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close menu"
-            >
-              <FaBars className="w-6 h-6" />
-            </button>
-          </div>
-          <ul className="mt-6">
-            {menuItems.map((item, index) => (
-              <MenuItem key={index} {...item} />
-            ))}
-          </ul>
-          <div className="px-6 my-6">
-            <button 
-              onClick={() => setShowReportDialog(true)}
-              className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-brown-600 border border-transparent rounded-lg active:bg-brown-600 hover:bg-brown-700 focus:outline-none focus:shadow-outline-brown"
-            >
-              ສ້າງການລາຍງານ
-              <span className="ml-2" aria-hidden="true">+</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {isOpen && isMobile && (
-        <div
-          className="fixed inset-0 z-20 bg-black bg-opacity-50 transition-opacity lg:hidden"
-          onClick={() => setIsOpen(false)}
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
         ></div>
       )}
 
-      <ReportDialog 
-        isOpen={showReportDialog} 
-        onClose={() => setShowReportDialog(false)} 
-      />
+      {/* Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-brown-800 transition duration-300 ease-in-out transform ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 lg:static lg:inset-0 lg:z-30`}
+      >
+        {/* Sidebar header */}
+        <div className="flex items-center justify-between h-16 px-4 bg-brown-900">
+          <div className="flex items-center">
+            <div className="flex-shrink-0 flex items-center">
+              <Image 
+                src="/images/logo.png" 
+                alt="SeeU Cafe" 
+                width={40} 
+                height={40}
+                className="rounded-full"
+              />
+              <span className="ml-2 text-white font-semibold text-lg">SeeU Cafe</span>
+            </div>
+          </div>
+          <button
+            className="lg:hidden text-gray-200 hover:text-white focus:outline-none"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <FaTimes className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Sidebar user info */}
+        <div className="px-4 py-3 border-b border-brown-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="h-10 w-10 rounded-full bg-brown-600 flex items-center justify-center overflow-hidden">
+                {user?.avatar ? (
+                  <Image 
+                    src={user.avatar} 
+                    alt={user.name} 
+                    width={40} 
+                    height={40}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-lg font-medium text-white">
+                    {user?.name?.charAt(0) || 'A'}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-white">{user?.name || 'Administrator'}</p>
+              <p className="text-xs text-brown-300">{user?.email || 'admin@seeucafe.com'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar navigation */}
+        <nav className="mt-4 px-2 space-y-1 overflow-y-auto max-h-[calc(100vh-8rem)]">
+          {filteredMenuItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                pathname === item.href
+                  ? 'bg-brown-700 text-white'
+                  : 'text-brown-200 hover:bg-brown-700 hover:text-white'
+              }`}
+              onClick={() => isMobile && setSidebarOpen(false)}
+            >
+              <div className={`mr-3 ${
+                pathname === item.href
+                  ? 'text-white'
+                  : 'text-brown-400 group-hover:text-brown-300'
+              }`}>
+                {item.icon}
+              </div>
+              {item.title}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Sidebar footer */}
+        <div className="absolute bottom-0 w-full p-4 border-t border-brown-700">
+          <div className="text-xs text-brown-400 text-center">
+            <p>&copy; {new Date().getFullYear()} SeeU Cafe</p>
+            <p className="mt-1">Version 1.0.0</p>
+          </div>
+        </div>
+      </div>
     </>
   );
 };

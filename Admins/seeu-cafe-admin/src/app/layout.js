@@ -1,26 +1,36 @@
+// app/layout.js
 import localFont from "next/font/local";
 import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { LoadingProvider } from '@/contexts/LoadingContext';
+import { ReactQueryProvider } from '@/providers/ReactQueryProvider';
+import { ApiLoadingHandler } from '@/components/common/ApiLoadingHandler';
 import "./globals.css";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
-  weight: "100 900",
+  display: "swap",
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+
+export const metadata = {
+  title: "SeeU Cafe Admin",
+  description: "Administrative dashboard for SeeU Cafe",
+};
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-        <Toaster />
+    <html lang="en" className={`${geistSans.variable}`}>
+      <body>
+        <ReactQueryProvider>
+          <AuthProvider>
+            <LoadingProvider>
+              <ApiLoadingHandler />
+              {children}
+              <Toaster position="top-right" />
+            </LoadingProvider>
+          </AuthProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );
