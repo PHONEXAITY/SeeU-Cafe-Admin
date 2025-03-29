@@ -65,74 +65,77 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  const login = async (credentials) => {
-    setLoading(true);
-    try {
-      // ถ้ามี property 'remember' ใน credentials ให้ลบออกก่อนส่งไป API
-      const apiCredentials = { ...credentials };
-      delete apiCredentials.remember;
-      
-      console.log('Login attempt with credentials:', JSON.stringify(apiCredentials));
-      console.log('API URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api');
-      
-      const { data } = await authService.login(apiCredentials);
-      console.log('Login response:', data);
-      
-      if (!data || (!data.token && !data.access_token)) {
-        throw new Error('Invalid response from server: No token received');
-      }
-      
-      // ตรวจสอบว่าผู้ใช้มี role เป็น admin หรือไม่
-      if (!data.user || data.user.role !== 'admin') {
-        throw new Error('Unauthorized: Only administrators can access this system');
-      }
-      
-      // Store token and user data (support both token and access_token formats)
-      const tokenValue = data.access_token || data.token;
-      setLocalStorage('token', tokenValue);
-      setLocalStorage('user', JSON.stringify(data.user));
-      
-      // Show success toast
-      toast.success('Login successful');
-      
-      // อัปเดตสถานะผู้ใช้ก่อนการ redirect
-      setUser(data.user);
-      
-      // ใช้ window.location.href แทน router.push เพื่อให้มั่นใจว่าจะ redirect
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          window.location.href = '/dashboard';
-        }
-      }, 100);
-      
-      return true;
-    } catch (error) {
-      console.error('Login failed:', error);
-      console.error('Error details:', error.response?.data || error.message);
-      
-      // แสดงข้อความข้อผิดพลาดที่เฉพาะเจาะจงมากขึ้น
-      if (error.message?.includes('Unauthorized: Only administrators')) {
-        toast.error('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเข้าใช้งานได้');
-      } else if (error.response?.status === 401 || 
-                error.response?.data?.message?.includes('password') || 
-                error.response?.data?.message?.includes('credentials')) {
-        // อัพเดท state errors ในหน้า login form
-        if (typeof window !== 'undefined' && window.loginFormErrorsCallback) {
-          window.loginFormErrorsCallback({
-            email: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
-            password: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-          });
-        }
-        toast.error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-      } else {
-        toast.error(error.response?.data?.message || 'เข้าสู่ระบบล้มเหลว โปรดลองอีกครั้ง');
-      }
-      
-      return false;
-    } finally {
-      setLoading(false);
+  // ในไฟล์ src/contexts/AuthContext.jsx แก้ไขฟังก์ชัน login ดังนี้
+
+const login = async (credentials) => {
+  setLoading(true);
+  try {
+    // ลบ property 'remember' ออกก่อนส่งไป API
+    const apiCredentials = { ...credentials };
+    delete apiCredentials.remember;
+    
+    console.log('Login attempt with credentials:', JSON.stringify(apiCredentials));
+    
+    const { data } = await authService.login(apiCredentials);
+    console.log('Login response:', data);
+    
+    if (!data || (!data.token && !data.access_token)) {
+      throw new Error('Invalid response from server: No token received');
     }
-  };
+    
+    // ตรวจสอบว่าผู้ใช้มี role เป็น admin หรือไม่
+    if (!data.user || data.user.role !== 'admin') {
+      throw new Error('Unauthorized: Only administrators can access this system');
+    }
+    
+    // Store token and user data (support both token and access_token formats)
+    const tokenValue = data.access_token || data.token;
+    setLocalStorage('token', tokenValue);
+    setLocalStorage('user', JSON.stringify(data.user));
+    
+    // อัปเดตสถานะผู้ใช้
+    setUser(data.user);
+    
+    // แสดง toast success
+    toast.success('เข้าสู่ระบบสำเร็จ');
+    
+    // ใช้ router.push เพื่อนำทางไปยังหน้า dashboard
+    // ในฟังก์ชัน login ของ AuthContext
+router.push('/dashboard');
+console.log('Router.push called with /dashboard');
+
+// หรือลองใช้ window.location.href โดยตรง
+console.log('Redirecting to dashboard with window.location.href');
+window.location.href = '/dashboard';
+    
+    return true;
+  } catch (error) {
+    console.error('Login failed:', error);
+    console.error('Error details:', error.response?.data || error.message);
+    
+    // จัดการแสดงข้อความข้อผิดพลาด
+    if (error.message?.includes('Unauthorized: Only administrators')) {
+      toast.error('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเข้าใช้งานได้');
+    } else if (error.response?.status === 401 || 
+              error.response?.data?.message?.includes('password') || 
+              error.response?.data?.message?.includes('credentials')) {
+      // อัพเดท state errors ในหน้า login form
+      if (typeof window !== 'undefined' && window.loginFormErrorsCallback) {
+        window.loginFormErrorsCallback({
+          email: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+          password: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+        });
+      }
+      toast.error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    } else {
+      toast.error(error.response?.data?.message || 'เข้าสู่ระบบล้มเหลว โปรดลองอีกครั้ง');
+    }
+    
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Logout function
   const logout = async () => {

@@ -1,3 +1,5 @@
+// ในไฟล์ src/components/layout/Layout.js
+
 'use client'
 
 import React, { useState, useEffect } from 'react';
@@ -5,19 +7,26 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import LoadingScreen from '@/components/LoadingScreen';
+import LoadingScreen from '@/components/common/LoadingScreen';
 
 export default function MainLayout({ children }) {
   const { isAuthenticated, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
-  // Check authentication status
-  useEffect(() => {
-    if (!loading && !isAuthenticated()) {
-      router.push('/login');
+ // ใน Layout.js - useEffect
+useEffect(() => {
+  if (!loading) {
+    if (!isAuthenticated()) {
+      console.log('User not authenticated in Layout, redirecting to login page');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+    } else {
+      console.log('User authenticated in Layout');
     }
-  }, [isAuthenticated, loading, router]);
+  }
+}, [isAuthenticated, loading, router]);
 
   // Show loading screen while checking authentication
   if (loading) {

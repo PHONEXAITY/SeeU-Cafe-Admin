@@ -3,24 +3,25 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import LoadingScreen from '@/components/common/LoadingScreen';
 
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
-    // รอจนกว่า auth state จะพร้อม (ไม่ loading)
+    // ตรวจสอบสถานะ authentication เมื่อ component mount
     if (!loading) {
-      // ถ้า authenticated แล้ว ให้ไปที่ dashboard
       if (isAuthenticated()) {
-        router.push('/dashboard');
+        console.log('User authenticated in HomePage, redirecting to dashboard...');
+        router.replace('/dashboard');
       } else {
-        // ถ้ายังไม่ authenticated ให้ไปที่หน้า login
-        router.push('/login');
+        console.log('User not authenticated in HomePage, redirecting to login...');
+        router.replace('/login');
       }
     }
   }, [isAuthenticated, loading, router]);
 
-  // แสดงหน้าว่างระหว่างการตรวจสอบและเปลี่ยนเส้นทาง
-  return null;
+  // แสดง loading screen ระหว่างตรวจสอบสถานะและเปลี่ยนเส้นทาง
+  return loading ? <LoadingScreen /> : null;
 }

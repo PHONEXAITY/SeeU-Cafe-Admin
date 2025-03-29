@@ -1,5 +1,8 @@
 // src/services/api.js
 import axios from 'axios';
+import { startLoading, stopLoading } from '@/store/slices/uiSlice';
+import { store } from '@/store';
+import { logout } from '@/store/slices/authSlice';
 
 // Global state เพื่อติดตามว่ามี API requests กำลังทำงานอยู่หรือไม่
 let activeRequests = 0;
@@ -16,13 +19,13 @@ export const setLoadingCallbacks = (callbacks) => {
   loadingCallbacks.stopLoading = callbacks.stopLoading || (() => {});
 };
 
-// Safe localStorage helper for SSR
 const getToken = () => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('token');
   }
   return null;
 };
+
 
 // Create axios instance with default config
 const api = axios.create({
@@ -34,30 +37,22 @@ const api = axios.create({
   }
 });
 
-// Request interceptor for adding auth token
+
 api.interceptors.request.use(
   (config) => {
-    // เพิ่มจำนวน active requests และแสดง loading ถ้าเป็น request แรก
-    activeRequests++;
-    if (activeRequests === 1) {
-      loadingCallbacks.startLoading();
-    }
+    // เริ่ม loading
+    store.dispatch(startLoading());
     
     const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // For debugging
-    console.log(`API Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => {
-    // ลดจำนวน active requests และซ่อน loading ถ้าไม่มี request อื่นทำงานอยู่
-    activeRequests = Math.max(0, activeRequests - 1);
-    if (activeRequests === 0) {
-      loadingCallbacks.stopLoading();
-    }
+    // หยุด loading
+    store.dispatch(stopLoading());
     
     console.error('API Request Error:', error);
     return Promise.reject(error);
@@ -67,38 +62,24 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => {
-    // ลดจำนวน active requests และซ่อน loading ถ้าไม่มี request อื่นทำงานอยู่
-    activeRequests = Math.max(0, activeRequests - 1);
-    if (activeRequests === 0) {
-      loadingCallbacks.stopLoading();
-    }
+    // หยุด loading
+    store.dispatch(stopLoading());
     
-    console.log(`API Response [${response.status}]:`, response.config.url);
     return response;
   },
   (error) => {
-    // ลดจำนวน active requests และซ่อน loading ถ้าไม่มี request อื่นทำงานอยู่
-    activeRequests = Math.max(0, activeRequests - 1);
-    if (activeRequests === 0) {
-      loadingCallbacks.stopLoading();
-    }
-    
-    console.error('API Response Error:', error);
+    // หยุด loading
+    store.dispatch(stopLoading());
     
     // Handle 401 Unauthorized responses
     if (error.response && error.response.status === 401) {
-      // Only clear storage in browser environment
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
+      store.dispatch(logout());
     }
+    
     return Promise.reject(error);
   }
 );
 
-// Auth services
 export const authService = {
   login: (credentials) => {
     // ตรวจสอบให้แน่ใจว่าไม่มี property ที่ไม่จำเป็น
@@ -112,17 +93,10 @@ export const authService = {
         if (error.response) {
           console.error(`Login error [${error.response.status}]:`, error.response.data);
           
-          // จัดการข้อผิดพลาดตามรหัสสถานะ HTTP
           if (error.response.status === 401) {
-            error.response.data = { 
-              ...error.response.data, 
-              message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' 
-            };
+            error.message = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
           } else if (error.response.status === 403) {
-            error.response.data = { 
-              ...error.response.data, 
-              message: 'ไม่มีสิทธิ์เข้าถึงระบบ' 
-            };
+            error.message = 'ไม่มีสิทธิ์เข้าถึงระบบ';
           }
         }
         throw error;

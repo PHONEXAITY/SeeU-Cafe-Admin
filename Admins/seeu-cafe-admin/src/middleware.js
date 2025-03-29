@@ -2,29 +2,34 @@
 import { NextResponse } from 'next/server';
 
 export function middleware(request) {
-  const token = request.cookies.get('token')?.value;
+  // ดึง token จาก localStorage แทนที่ cookies
+  // หมายเหตุ: middleware ไม่สามารถเข้าถึง localStorage โดยตรงได้
+  // ดังนั้นเราต้องใช้ cookies หรือ headers แทน
+  const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
   
-  // Public paths that don't require authentication
+  // Public paths ที่ไม่ต้องการการยืนยันตัวตน
   const publicPaths = ['/login', '/forgot-password', '/reset-password'];
   
-  // Is the path public?
-  const isPublicPath = publicPaths.includes(pathname);
+  // ตรวจสอบว่าเป็น path สาธารณะหรือไม่
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
   
-  // Redirect to login if trying to access a protected route without a token
+  // ถ้าไม่มี token และไม่ได้อยู่ใน path สาธารณะ ให้ redirect ไปยังหน้า login
   if (!token && !isPublicPath) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
   
-  // Redirect to dashboard if trying to access a public route with a token
+  // ถ้ามี token และอยู่ใน path สาธารณะ ให้ redirect ไปยังหน้า dashboard
   if (token && isPublicPath) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const dashboardUrl = new URL('/dashboard', request.url);
+    return NextResponse.redirect(dashboardUrl);
   }
   
   return NextResponse.next();
 }
 
-// Specify which routes this middleware should run on
+// ระบุ routes ที่ middleware นี้ควรทำงาน
 export const config = {
   matcher: [
     // Apply to all routes except for static files, api routes, and _next
