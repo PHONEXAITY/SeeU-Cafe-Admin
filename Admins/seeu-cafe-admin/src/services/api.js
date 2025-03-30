@@ -1,6 +1,7 @@
 'use client';
 
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -9,13 +10,14 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-  }
+  },
+  withCredentials: true, // ตั้งค่านี้เป็น true เพื่อส่ง cookies ไปกลับ server
 });
 
-// Helper to get token from localStorage (only on client)
+// Helper to get token from cookies (only on client)
 const getToken = () => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('token');
+    return Cookies.get('auth_token');
   }
   return null;
 };
@@ -66,6 +68,8 @@ api.interceptors.request.use(
       }
     }
     
+    // You might not need this if you're using withCredentials
+    // but keeping it as a fallback for compatibility
     const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -141,7 +145,16 @@ export const authService = {
     
     console.log('Calling login API with:', loginData);
     return api.post('/auth/login', loginData)
+      .then(response => {
+        // บันทึก token ใน cookie ถ้ามาจาก response
+        if (response.data && response.data.access_token) {
+          Cookies.set('auth_token', response.data.access_token, { expires: 7, path: '/' });
+        }
+        return response;
+      })
       .catch(error => {
+        console.error('Login error details:', error);
+        
         if (error.response) {
           console.error(`Login error [${error.response.status}]:`, error.response.data);
           
@@ -150,16 +163,41 @@ export const authService = {
           } else if (error.response.status === 403) {
             error.message = 'ไม่มีสิทธิ์เข้าถึงระบบ';
           }
+        } else if (error.request) {
+          // คำขอถูกส่งแต่ไม่ได้รับการตอบกลับ
+          console.error('No response received:', error.request);
+          error.message = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+        } else {
+          // เกิดข้อผิดพลาดในการตั้งค่าคำขอ
+          console.error('Request setup error:', error.message);
         }
+        
         throw error;
       });
   },
-  logout: () => api.post('/auth/logout'),
-  register: (userData) => api.post('/auth/register', userData),
+  logout: () => {
+    return api.post('/auth/logout')
+      .then(response => {
+        // ลบ token จาก cookie
+        Cookies.remove('auth_token', { path: '/' });
+        return response;
+      });
+  },
+  register: (userData) => {
+    return api.post('/auth/register', userData)
+      .then(response => {
+        // บันทึก token ใน cookie ถ้ามาจาก response
+        if (response.data && response.data.access_token) {
+          Cookies.set('auth_token', response.data.access_token, { expires: 7, path: '/' });
+        }
+        return response;
+      });
+  },
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (userData) => api.put('/auth/profile', userData),
   changePassword: (passwordData) => api.post('/auth/change-password', passwordData)
 };
+
 
 // Product services
 export const productService = {

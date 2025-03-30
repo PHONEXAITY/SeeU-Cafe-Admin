@@ -2,226 +2,181 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { authService } from '@/services/api';
-import { toast } from 'react-hot-toast';
+import Cookies from 'js-cookie';
 
-// Helper to load user from localStorage
-const loadUserFromStorage = () => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const userString = localStorage.getItem('user');
-    return userString ? JSON.parse(userString) : null;
-  } catch (error) {
-    console.error('Error loading user from localStorage:', error);
-    return null;
-  }
-};
-
-// Async thunk for login
+// Async actions
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials, { rejectWithValue }) => {
     try {
-      // Remove the 'remember' property before sending to API
-      const apiCredentials = { ...credentials };
-      delete apiCredentials.remember;
-      
-      console.log('Login attempt with credentials:', JSON.stringify(apiCredentials));
-      
-      const { data } = await authService.login(apiCredentials);
-      console.log('Login response:', data);
-      
-      if (!data || (!data.token && !data.access_token)) {
-        throw new Error('Invalid response from server: No token received');
+      console.log('Login attempt with credentials:', JSON.stringify(credentials));
+      const response = await authService.login(credentials);
+      if (response.data.access_token && typeof window !== 'undefined') {
+        Cookies.set('auth_token', response.data.access_token, { expires: 7 }); // Store token in cookie for 7 days
       }
-      
-      // Check if user has 'admin' role
-      if (!data.user || data.user.role !== 'admin') {
-        throw new Error('Unauthorized: Only administrators can access this system');
-      }
-      
-      // Store token and user data (support both token and access_token formats)
-      const tokenValue = data.access_token || data.token;
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('token', tokenValue);
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
-      
-      // Return user data to be stored in Redux state
-      return data.user;
+      return response.data;
     } catch (error) {
       console.error('Login failed:', error);
-      console.error('Error details:', error.response?.data || error.message);
-      
-      if (error.message?.includes('Unauthorized: Only administrators')) {
-        toast.error('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเข้าใช้งานได้');
-      } else if (error.response?.status === 401 || 
-                error.response?.data?.message?.includes('password') || 
-                error.response?.data?.message?.includes('credentials')) {
-        if (typeof window !== 'undefined' && window.loginFormErrorsCallback) {
-          window.loginFormErrorsCallback({
-            email: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
-            password: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-          });
-        }
-        toast.error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-      } else {
-        toast.error(error.response?.data?.message || 'เข้าสู่ระบบล้มเหลว โปรดลองอีกครั้ง');
+      console.error('Error details:', error.message);
+
+      // Handle form errors on client-side
+      if (typeof window !== 'undefined' && window.loginFormErrorsCallback) {
+        window.loginFormErrorsCallback({
+          email: '',
+          password: error.message || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง',
+        });
       }
-      
-      return rejectWithValue(error.response?.data || { message: error.message });
+
+      return rejectWithValue(error.message || 'Login failed');
     }
   }
 );
 
-// Async thunk for logout
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
       await authService.logout();
-      
-      // Clear localStorage
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        Cookies.remove('auth_token'); // Remove token on logout
       }
-      
-      return null;
+      return true;
     } catch (error) {
-      console.error('Logout error:', error);
-      
-      // Even if API fails, we'll still clear local storage
+      console.error('Logout failed:', error);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        Cookies.remove('auth_token'); // Remove token even if logout fails
       }
-      
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.message || 'Logout failed');
     }
   }
 );
 
-// Async thunk for getting user profile
-export const getUserProfile = createAsyncThunk(
-  'auth/getUserProfile',
+export const fetchUserProfile = createAsyncThunk(
+  'auth/fetchUserProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await authService.getProfile();
-      
-      // Update user in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(data));
-      }
-      
-      return data;
+      const response = await authService.getProfile();
+      return response.data;
     } catch (error) {
-      console.error('Get profile error:', error);
-      
-      // If token is invalid, log the user out
-      if (error.response?.status === 401 && typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+      console.error('Fetch user profile failed:', error);
+      if (error.response && error.response.status === 401) {
+        if (typeof window !== 'undefined') {
+          Cookies.remove('auth_token'); // Clear token on 401
+        }
+        return rejectWithValue('unauthorized');
       }
-      
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.message || 'Fetch profile failed');
     }
   }
 );
 
-// Auth slice
+// Initial state
+const initialState = {
+  user: null,
+  token: typeof window !== 'undefined' ? Cookies.get('auth_token') || null : null,
+  isAuthenticated: false,
+  isLoading: false,
+  error: null,
+  redirectPath: null,
+  isInitialized: false,
+};
+
 const authSlice = createSlice({
   name: 'auth',
-  initialState: {
-    user: typeof window !== 'undefined' ? loadUserFromStorage() : null,
-    loading: false,
-    isInitialized: false,
-    error: null,
-    redirectTo: null,
-  },
+  initialState,
   reducers: {
-    initializeAuth: (state) => {
-      state.isInitialized = true;
+    setRedirectPath: (state, action) => {
+      state.redirectPath = action.payload;
     },
     clearRedirect: (state) => {
-      state.redirectTo = null;
+      state.redirectPath = null;
     },
-    logout: (state) => {
-      state.user = null;
-      state.isInitialized = true;
-      state.redirectTo = '/login';
-      
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
+    startLoading: (state) => {
+      state.isLoading = true;
+    },
+    stopLoading: (state) => {
+      state.isLoading = false;
+    },
+    setInitialized: (state, action) => {
+      state.isInitialized = action.payload;
+    },
+    reset: () => initialState,
   },
   extraReducers: (builder) => {
     builder
-      // Login cases
+      // Login
       .addCase(loginUser.pending, (state) => {
-        state.loading = true;
+        state.isLoading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        console.log('Login fulfilled, user:', action.payload);
-        state.user = action.payload;
-        state.loading = false;
+        state.isLoading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.user;
+        state.token = action.payload.access_token;
         state.error = null;
-        state.redirectTo = '/dashboard'; // Set redirect path after successful login
       })
       .addCase(loginUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || { message: 'An unknown error occurred' };
+        state.isLoading = false;
+        state.error = action.payload;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.token = null;
       })
-      
-      // Logout cases
+      // Logout
       .addCase(logoutUser.pending, (state) => {
-        state.loading = true;
+        state.isLoading = true;
       })
       .addCase(logoutUser.fulfilled, (state) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
         state.user = null;
-        state.loading = false;
+        state.token = null;
         state.error = null;
-        state.redirectTo = '/login';
       })
       .addCase(logoutUser.rejected, (state) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
         state.user = null;
-        state.loading = false;
-        state.redirectTo = '/login';
+        state.token = null;
+        state.error = null; // Clear error on logout, even if it fails
       })
-      
-      // Get profile cases
-      .addCase(getUserProfile.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(getUserProfile.fulfilled, (state, action) => {
-        state.user = action.payload;
-        state.loading = false;
-        state.error = null;
-      })
-      .addCase(getUserProfile.rejected, (state, action) => {
-        if (action.payload?.status === 401) {
-          state.user = null;
-          state.redirectTo = '/login';
+      // Fetch User Profile
+      .addCase(fetchUserProfile.pending, (state) => {
+        if (!state.isInitialized) {
+          state.isLoading = true;
         }
-        state.loading = false;
+      })
+      .addCase(fetchUserProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload;
+        state.isInitialized = true;
+      })
+      .addCase(fetchUserProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isInitialized = true;
+        if (action.payload === 'unauthorized') {
+          state.isAuthenticated = false;
+          state.user = null;
+          state.token = null;
+        }
         state.error = action.payload;
       });
-  }
+  },
 });
 
-export const { initializeAuth, clearRedirect, logout } = authSlice.actions;
+// Export actions
+export const logout = logoutUser; // Alias for logoutUser
+export const { setRedirectPath, clearRedirect, startLoading, stopLoading, setInitialized, reset } = authSlice.actions;
 
-// Selectors
-export const selectAuth = (state) => state.auth;
-export const selectUser = (state) => state.auth.user;
-export const selectIsAuthenticated = (state) => !!state.auth.user;
-export const selectAuthLoading = (state) => state.auth.loading;
-export const selectAuthInitialized = (state) => state.auth.isInitialized;
+// Export selectors (renamed selectCurrentUser to selectUser for consistency with your components)
+export const selectUser = (state) => state.auth.user; // Changed from selectCurrentUser
+export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
+export const selectAuthLoading = (state) => state.auth.isLoading;
 export const selectAuthError = (state) => state.auth.error;
-export const selectRedirectPath = (state) => state.auth.redirectTo;
+export const selectRedirectPath = (state) => state.auth.redirectPath;
+export const selectAuthInitialized = (state) => state.auth.isInitialized;
+export const selectAuthToken = (state) => state.auth.token;
 
 export default authSlice.reducer;

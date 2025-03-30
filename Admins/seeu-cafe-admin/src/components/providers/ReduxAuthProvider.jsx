@@ -1,65 +1,66 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  initializeAuth,
+  setInitialized,  // เปลี่ยนจาก initializeAuth เป็น setInitialized
   selectAuthInitialized,
-  getUserProfile,
-  selectIsAuthenticated
+  fetchUserProfile,  // ใช้ fetchUserProfile ตามที่มีใน authSlice
+  selectIsAuthenticated,
 } from '@/store/slices/authSlice';
 import LoadingScreen from '@/components/common/LoadingScreen';
+import Cookies from 'js-cookie';
 
 const ReduxAuthProvider = ({ children }) => {
   const dispatch = useDispatch();
   const isInitialized = useSelector(selectAuthInitialized);
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  
-  // Handle initial auth state
+
   useEffect(() => {
-    if (isInitialized) return; // ป้องกันการทำงานซ้ำ
-    
+    if (isInitialized) return;
+
     const initAuth = async () => {
       try {
-        // Check if token exists
         if (typeof window !== 'undefined') {
-          const token = localStorage.getItem('token');
-          
+          const token = Cookies.get('auth_token');
           if (token) {
-            // Verify token by fetching user profile
-            const result = await dispatch(getUserProfile()).unwrap();
-            // Check if user has 'admin' role
-            if (!result || result.role !== 'admin') {
-              throw new Error('Unauthorized: Only administrators can access');
+            try {
+              // ใช้ fetchUserProfile แทน getUserProfile
+              const result = await dispatch(fetchUserProfile()).unwrap();
+              if (!result || result.role !== 'admin') {
+                throw new Error('Unauthorized: Only administrators can access');
+              }
+            } catch (profileError) {
+              console.error('Error fetching profile:', profileError);
+              // ลบ cookies ถ้าโปรไฟล์ไม่ถูกต้อง
+              Cookies.remove('auth_token');
+              Cookies.remove('user');
             }
           }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        // Clear token only on 401 error
         if (error.response?.status === 401 && typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          Cookies.remove('auth_token');
+          Cookies.remove('user');
         }
       } finally {
-        // Mark auth as initialized regardless of outcome
-        dispatch(initializeAuth());
+        // ใช้ setInitialized แทน initializeAuth
+        dispatch(setInitialized(true));
       }
     };
-    
+
     initAuth();
   }, [dispatch, isInitialized]);
-  
-  // Debug logging
+
   useEffect(() => {
     console.log('ReduxAuthProvider state:', { isInitialized, isAuthenticated });
   }, [isInitialized, isAuthenticated]);
-  
-  // Show loading screen until authentication is initialized
+
   if (!isInitialized) {
     return <LoadingScreen />;
   }
-  
+
   return children;
 };
 

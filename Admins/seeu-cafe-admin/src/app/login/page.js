@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import Image from 'next/image'; // Import Image component from Next.js
 import { FaEnvelope, FaLock } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser, selectAuthLoading, selectIsAuthenticated, selectAuthInitialized, selectRedirectPath, clearRedirect } from '@/store/slices/authSlice';
@@ -17,6 +17,7 @@ const LoginPage = () => {
     password: ''
   });
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [backgroundsLoaded, setBackgroundsLoaded] = useState(false);
   
   const dispatch = useDispatch();
   const router = useRouter();
@@ -24,6 +25,42 @@ const LoginPage = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isInitialized = useSelector(selectAuthInitialized);
   const redirectPath = useSelector(selectRedirectPath);
+  const cafeImg = new Image();
+const coffeeBeansImg = new Image();
+
+  // Preload background images
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cafeImg = new window.Image();
+      const coffeeBeansImg = new window.Image();
+      
+      cafeImg.src = './cafe.jpg';
+      coffeeBeansImg.src = './coffee-beans.jpg';
+      
+      let loadedCount = 0;
+      const onLoad = () => {
+        loadedCount++;
+        if (loadedCount === 2) {
+          setBackgroundsLoaded(true);
+        }
+      };
+      
+      cafeImg.onload = onLoad;
+      coffeeBeansImg.onload = onLoad;
+      
+      // Fallback if images take too long
+      const timeout = setTimeout(() => {
+        if (!backgroundsLoaded) {
+          setBackgroundsLoaded(true);
+        }
+      }, 3000);
+      
+      return () => clearTimeout(timeout);
+    } else {
+      // If running on server-side, set as loaded
+      setBackgroundsLoaded(true);
+    }
+  }, [backgroundsLoaded]);
 
   // Expose errors callback to window for API error handling
   useEffect(() => {
@@ -37,11 +74,6 @@ const LoginPage = () => {
       }
     };
   }, []);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('LoginPage state:', { isAuthenticated, isInitialized, isRedirecting, redirectPath });
-  }, [isAuthenticated, isInitialized, isRedirecting, redirectPath]);
 
   // Handle redirect after authentication
   useEffect(() => {
@@ -126,16 +158,30 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat p-4 relative font-['Phetsarath_OT'] " 
-    style={{ backgroundImage: "url('/cafe.jpg')" }}>
+    <div className="flex min-h-screen items-center justify-center p-4 relative font-['Phetsarath_OT']"
+         style={{ 
+           backgroundImage: backgroundsLoaded ? "url('/cafe.jpg')" : "none",
+           backgroundColor: !backgroundsLoaded ? "#f3e8d9" : "initial",
+           backgroundSize: "cover",
+           backgroundPosition: "center",
+           backgroundRepeat: "no-repeat"
+         }}>
       <div className="absolute inset-0 backdrop-blur-sm"></div>
       
       <div className="w-full max-w-md bg-white bg-opacity-80 rounded-xl shadow-2xl p-8 transition-all duration-300 ease-in-out hover:shadow-3xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center opacity-70" style={{ backgroundImage: "url('/coffee-beans.jpg')" }}></div>
+        <div className="absolute inset-0 bg-cover bg-center opacity-70" 
+             style={{ 
+               backgroundImage: backgroundsLoaded ? "url('/coffee-beans.jpg')" : "none",
+               backgroundColor: !backgroundsLoaded ? "#e0d0c1" : "initial"
+             }}></div>
         
         <div className="relative z-10">
           <div className="text-center">
-            <Image src="/logo.png" alt="SeeU Cafe Logo" width={100} height={100} className="mx-auto rounded-full shadow-lg" priority/>
+            {backgroundsLoaded ? (
+              <Image src="/logo.png" alt="SeeU Cafe Logo" width={100} height={100} className="mx-auto rounded-full shadow-lg" priority/>
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-brown-300 animate-pulse mx-auto shadow-lg"></div>
+            )}
             <h2 className="mt-6 text-3xl font-extrabold text-brown-900">SeeU Cafe</h2>
             <p className="mt-2 text-sm text-brown-600">ເຂົ້າສູ່ລະບົບ Admin</p>
           </div>

@@ -584,8 +584,8 @@ const MenuItem = ({ item, collapsed, isRtl, darkMode, pathname, toggleSubmenu, e
 };
 // Main Component
 const UltraResponsiveCafeSidebar = ({ sidebarOpen: externalSidebarOpen, setSidebarOpen: setExternalSidebarOpen }) => {
-  const pathname = usePathname();
   const user = useSelector(selectUser);
+  const pathname = usePathname();
   const [state, dispatch] = useReducer(reducer, initialState);
   const { collapsed, sidebarOpen, expandedMenus, searchVisible, darkMode, showQuickActions } = state;
   const [isMobile, setIsMobile] = useState(false);

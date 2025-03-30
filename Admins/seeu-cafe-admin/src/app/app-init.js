@@ -3,22 +3,20 @@
 import { useEffect } from 'react';
 import { setupApiRedux } from '@/services/api';
 import { store } from '@/store';
-import { logout } from '@/store/slices/authSlice';
+import { logoutUser } from '@/store/slices/authSlice'; // เปลี่ยนจาก logout เป็น logoutUser
 import { startLoading, stopLoading } from '@/store/slices/uiSlice';
 
-// Component สำหรับตั้งค่า Redux กับ API Service
 export default function AppInitializer() {
   useEffect(() => {
-    // ตั้งค่า API Service กับ Redux
     setupApiRedux({
       dispatch: store.dispatch,
       actions: {
-        logout,
+        logout: logoutUser, 
         startLoading,
         stopLoading
       }
     });
   }, []);
 
-  return null; // ไม่ render อะไร
+  return null; 
 }
