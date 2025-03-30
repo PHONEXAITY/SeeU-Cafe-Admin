@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image'; // Import Image component from Next.js
+import Image from 'next/image';
 import { FaEnvelope, FaLock } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser, selectAuthLoading, selectIsAuthenticated, selectAuthInitialized, selectRedirectPath, clearRedirect } from '@/store/slices/authSlice';
 import { toast } from 'react-hot-toast';
+import logoImage from '../../../public/logo.png';
+import cafeImage from '../../../public/cafe.jpg';
+import coffeeBeansImage from '../../../public/coffee-beans.jpg';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -25,44 +28,29 @@ const LoginPage = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isInitialized = useSelector(selectAuthInitialized);
   const redirectPath = useSelector(selectRedirectPath);
-  const cafeImg = new Image();
-const coffeeBeansImg = new Image();
 
-  // Preload background images
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const cafeImg = new window.Image();
-      const coffeeBeansImg = new window.Image();
+      const hasValidImages = cafeImage && coffeeBeansImage && logoImage;
       
-      cafeImg.src = './cafe.jpg';
-      coffeeBeansImg.src = './coffee-beans.jpg';
+      if (hasValidImages) {
+        setBackgroundsLoaded(true);
+      } else {
+        console.error('Failed to statically import one or more images');
+      }
       
-      let loadedCount = 0;
-      const onLoad = () => {
-        loadedCount++;
-        if (loadedCount === 2) {
-          setBackgroundsLoaded(true);
-        }
-      };
-      
-      cafeImg.onload = onLoad;
-      coffeeBeansImg.onload = onLoad;
-      
-      // Fallback if images take too long
       const timeout = setTimeout(() => {
         if (!backgroundsLoaded) {
           setBackgroundsLoaded(true);
         }
-      }, 3000);
+      }, 1000);
       
       return () => clearTimeout(timeout);
     } else {
-      // If running on server-side, set as loaded
       setBackgroundsLoaded(true);
     }
   }, [backgroundsLoaded]);
 
-  // Expose errors callback to window for API error handling
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.loginFormErrorsCallback = setErrors;
@@ -160,7 +148,7 @@ const coffeeBeansImg = new Image();
   return (
     <div className="flex min-h-screen items-center justify-center p-4 relative font-['Phetsarath_OT']"
          style={{ 
-           backgroundImage: backgroundsLoaded ? "url('/cafe.jpg')" : "none",
+           backgroundImage: backgroundsLoaded ? `url(${cafeImage.src})` : "none",
            backgroundColor: !backgroundsLoaded ? "#f3e8d9" : "initial",
            backgroundSize: "cover",
            backgroundPosition: "center",
@@ -171,16 +159,36 @@ const coffeeBeansImg = new Image();
       <div className="w-full max-w-md bg-white bg-opacity-80 rounded-xl shadow-2xl p-8 transition-all duration-300 ease-in-out hover:shadow-3xl relative overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center opacity-70" 
              style={{ 
-               backgroundImage: backgroundsLoaded ? "url('/coffee-beans.jpg')" : "none",
+               backgroundImage: backgroundsLoaded ? `url(${coffeeBeansImage.src})` : "none",
                backgroundColor: !backgroundsLoaded ? "#e0d0c1" : "initial"
              }}></div>
         
         <div className="relative z-10">
           <div className="text-center">
             {backgroundsLoaded ? (
-              <Image src="/logo.png" alt="SeeU Cafe Logo" width={100} height={100} className="mx-auto rounded-full shadow-lg" priority/>
+              <div className="relative w-24 h-24 mx-auto">
+                <Image 
+                  src={logoImage}
+                  alt="SeeU Cafe Logo" 
+                  width={100} 
+                  height={100} 
+                  className="mx-auto rounded-full shadow-lg" 
+                  priority
+                  onError={(e) => {
+                    console.error('Failed to load logo');
+                    e.target.style.display = 'none';
+                    // Show fallback
+                    const fallback = document.createElement('div');
+                    fallback.className = 'w-24 h-24 rounded-full bg-brown-300 mx-auto shadow-lg flex items-center justify-center text-white font-bold';
+                    fallback.innerText = 'SeeU';
+                    e.target.parentNode.appendChild(fallback);
+                  }}
+                />
+              </div>
             ) : (
-              <div className="w-24 h-24 rounded-full bg-brown-300 animate-pulse mx-auto shadow-lg"></div>
+              <div className="w-24 h-24 rounded-full bg-brown-300 animate-pulse mx-auto shadow-lg flex items-center justify-center text-white font-bold">
+                SeeU
+              </div>
             )}
             <h2 className="mt-6 text-3xl font-extrabold text-brown-900">SeeU Cafe</h2>
             <p className="mt-2 text-sm text-brown-600">ເຂົ້າສູ່ລະບົບ Admin</p>
