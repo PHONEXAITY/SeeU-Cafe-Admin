@@ -1,31 +1,6 @@
-// src/services/api.js
+'use client';
+
 import axios from 'axios';
-import { startLoading, stopLoading } from '@/store/slices/uiSlice';
-import { store } from '@/store';
-import { logout } from '@/store/slices/authSlice';
-
-// Global state เพื่อติดตามว่ามี API requests กำลังทำงานอยู่หรือไม่
-let activeRequests = 0;
-
-// Callbacks สำหรับจัดการสถานะการโหลด
-const loadingCallbacks = {
-  startLoading: () => {},
-  stopLoading: () => {}
-};
-
-// ฟังก์ชันสำหรับตั้งค่า callbacks
-export const setLoadingCallbacks = (callbacks) => {
-  loadingCallbacks.startLoading = callbacks.startLoading || (() => {});
-  loadingCallbacks.stopLoading = callbacks.stopLoading || (() => {});
-};
-
-const getToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('token');
-  }
-  return null;
-};
-
 
 // Create axios instance with default config
 const api = axios.create({
@@ -37,11 +12,59 @@ const api = axios.create({
   }
 });
 
+// Helper to get token from localStorage (only on client)
+const getToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('token');
+  }
+  return null;
+};
 
+// Callbacks สำหรับจัดการสถานะการโหลด
+const loadingCallbacks = {
+  startLoading: () => {},
+  stopLoading: () => {}
+};
+
+// ตัวแปรเพื่อเก็บ dispatch function ที่จะถูกตั้งค่าภายหลัง
+let dispatchFunction = null;
+let logoutAction = null;
+let startLoadingAction = null;
+let stopLoadingAction = null;
+
+// ฟังก์ชันสำหรับตั้งค่า Redux actions และ dispatch
+export const setupApiRedux = ({ dispatch, actions }) => {
+  dispatchFunction = dispatch;
+  if (actions) {
+    logoutAction = actions.logout;
+    startLoadingAction = actions.startLoading;
+    stopLoadingAction = actions.stopLoading;
+  }
+};
+
+// ฟังก์ชันสำหรับตั้งค่า callbacks
+export const setLoadingCallbacks = (callbacks) => {
+  if (callbacks) {
+    loadingCallbacks.startLoading = callbacks.startLoading || (() => {});
+    loadingCallbacks.stopLoading = callbacks.stopLoading || (() => {});
+  }
+};
+
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // เริ่ม loading
-    store.dispatch(startLoading());
+    // เริ่ม loading (จากทั้ง Redux และ LoadingContext)
+    if (typeof window !== 'undefined') {
+      // ใช้ Redux dispatch ถ้ามี
+      if (dispatchFunction && startLoadingAction) {
+        dispatchFunction(startLoadingAction());
+      }
+      
+      // ใช้ LoadingContext callback
+      if (loadingCallbacks.startLoading) {
+        loadingCallbacks.startLoading();
+      }
+    }
     
     const token = getToken();
     if (token) {
@@ -51,45 +74,74 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    // หยุด loading
-    store.dispatch(stopLoading());
+    // หยุด loading (จากทั้ง Redux และ LoadingContext)
+    if (typeof window !== 'undefined') {
+      // ใช้ Redux dispatch ถ้ามี
+      if (dispatchFunction && stopLoadingAction) {
+        dispatchFunction(stopLoadingAction());
+      }
+      
+      // ใช้ LoadingContext callback
+      if (loadingCallbacks.stopLoading) {
+        loadingCallbacks.stopLoading();
+      }
+    }
     
     console.error('API Request Error:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for handling errors
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
-    // หยุด loading
-    store.dispatch(stopLoading());
+    // หยุด loading (จากทั้ง Redux และ LoadingContext)
+    if (typeof window !== 'undefined') {
+      // ใช้ Redux dispatch ถ้ามี
+      if (dispatchFunction && stopLoadingAction) {
+        dispatchFunction(stopLoadingAction());
+      }
+      
+      // ใช้ LoadingContext callback
+      if (loadingCallbacks.stopLoading) {
+        loadingCallbacks.stopLoading();
+      }
+    }
     
     return response;
   },
   (error) => {
-    // หยุด loading
-    store.dispatch(stopLoading());
-    
-    // Handle 401 Unauthorized responses
-    if (error.response && error.response.status === 401) {
-      store.dispatch(logout());
+    // หยุด loading (จากทั้ง Redux และ LoadingContext)
+    if (typeof window !== 'undefined') {
+      // ใช้ Redux dispatch ถ้ามี
+      if (dispatchFunction && stopLoadingAction) {
+        dispatchFunction(stopLoadingAction());
+      }
+      
+      // ใช้ LoadingContext callback
+      if (loadingCallbacks.stopLoading) {
+        loadingCallbacks.stopLoading();
+      }
+      
+      // Handle 401 Unauthorized responses
+      if (error.response && error.response.status === 401 && dispatchFunction && logoutAction) {
+        dispatchFunction(logoutAction());
+      }
     }
     
     return Promise.reject(error);
   }
 );
 
+// Auth services
 export const authService = {
   login: (credentials) => {
-    // ตรวจสอบให้แน่ใจว่าไม่มี property ที่ไม่จำเป็น
     const { email, password } = credentials;
     const loginData = { email, password };
     
     console.log('Calling login API with:', loginData);
     return api.post('/auth/login', loginData)
       .catch(error => {
-        // เพิ่มการจัดการข้อผิดพลาดที่เฉพาะเจาะจงมากขึ้น
         if (error.response) {
           console.error(`Login error [${error.response.status}]:`, error.response.data);
           

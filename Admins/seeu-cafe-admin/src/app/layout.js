@@ -1,12 +1,15 @@
-// app/layout.js
 import localFont from "next/font/local";
 import { Toaster } from 'react-hot-toast';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { ReactQueryProvider } from '@/providers/ReactQueryProvider';
 import { ApiLoadingHandler } from '@/components/common/ApiLoadingHandler';
-import { Provider } from 'react-redux';
-import { store } from '@/store';
+import StoreProvider from '@/components/providers/StoreProvider';
+import ReduxAuthProvider from '@/components/providers/ReduxAuthProvider';
+import dynamic from 'next/dynamic';
 import "./globals.css";
+
+// ใช้ dynamic import เพื่อป้องกัน server-side rendering สำหรับส่วนที่ต้องการ client-side เท่านั้น
+const AppInitializer = dynamic(() => import('@/app/app-init'), { ssr: false });
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -23,15 +26,18 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable}`}>
       <body>
-      <Provider store={store}>
+        <StoreProvider>
+          <AppInitializer />
           <ReactQueryProvider>
             <LoadingProvider>
-              <ApiLoadingHandler />
-              {children}
-              <Toaster position="top-right" />
+              <ReduxAuthProvider>
+                <ApiLoadingHandler />
+                {children}
+                <Toaster position="top-right" />
+              </ReduxAuthProvider>
             </LoadingProvider>
-            </ReactQueryProvider>
-            </Provider>
+          </ReactQueryProvider>
+        </StoreProvider>
       </body>
     </html>
   );

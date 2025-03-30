@@ -2,17 +2,19 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectAuthLoading } from '@/store/slices/authSlice';
 import LoadingScreen from '@/components/common/LoadingScreen';
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const loading = useSelector(selectAuthLoading);
 
   useEffect(() => {
-    // ตรวจสอบสถานะ authentication เมื่อ component mount
+    // Check authentication status when component mounts
     if (!loading) {
-      if (isAuthenticated()) {
+      if (isAuthenticated) {
         console.log('User authenticated in HomePage, redirecting to dashboard...');
         router.replace('/dashboard');
       } else {
@@ -22,6 +24,6 @@ export default function HomePage() {
     }
   }, [isAuthenticated, loading, router]);
 
-  // แสดง loading screen ระหว่างตรวจสอบสถานะและเปลี่ยนเส้นทาง
+  // Show loading screen while checking status and redirecting
   return loading ? <LoadingScreen /> : null;
 }

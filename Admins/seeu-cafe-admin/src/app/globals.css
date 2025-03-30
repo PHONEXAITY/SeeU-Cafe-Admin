@@ -86,3 +86,193 @@
 .animate-progress {
   animation: progress 2s ease-in-out infinite;
 }
+.hide-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(165, 42, 42, 0.3) transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hide-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(165, 42, 42, 0.3);
+  border-radius: 9999px;
+}
+
+.sidebar-collapsed .hide-scrollbar::-webkit-scrollbar {
+  width: 0px;
+}
+
+html.dark-mode {
+  --bg-color: #121212;
+  --text-color: #e5e5e5;
+}
+.cafe-scrollbar-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(194, 154, 107, 0.3) rgba(248, 244, 237, 0.1);
+}
+
+.cafe-scrollbar-light::-webkit-scrollbar {
+  width: 5px;
+}
+
+.cafe-scrollbar-light::-webkit-scrollbar-track {
+  background: rgba(248, 244, 237, 0.1);
+  border-radius: 9999px;
+}
+
+.cafe-scrollbar-light::-webkit-scrollbar-thumb {
+  background-color: rgba(194, 154, 107, 0.3);
+  border-radius: 9999px;
+}
+
+.cafe-scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 221, 208, 0.3) rgba(53, 38, 23, 0.1);
+}
+
+.cafe-scrollbar-dark::-webkit-scrollbar {
+  width: 5px;
+}
+
+.cafe-scrollbar-dark::-webkit-scrollbar-track {
+  background: rgba(53, 38, 23, 0.3);
+  border-radius: 9999px;
+}
+
+.cafe-scrollbar-dark::-webkit-scrollbar-thumb {
+  background-color: rgba(232, 221, 208, 0.3);
+  border-radius: 9999px;
+}
+
+.sidebar-collapsed .cafe-scrollbar-light::-webkit-scrollbar,
+.sidebar-collapsed .cafe-scrollbar-dark::-webkit-scrollbar {
+  width: 0px;
+  display: none;
+}
+
+html.cafe-dark-mode {
+  --color-bg: #352617;
+  --color-text: #F8F4ED;
+}
+@keyframes steamRise {
+  0% { 
+    transform: translateY(0) translateX(0) scale(0.5);
+    opacity: 0; 
+  }
+  30% { 
+    transform: translateY(-10px) translateX(-2px) scale(0.8);
+    opacity: 0.7; 
+  }
+  70% { 
+    transform: translateY(-20px) translateX(2px) scale(1.2);
+    opacity: 0.5; 
+  }
+  100% { 
+    transform: translateY(-30px) translateX(-1px) scale(1.5);
+    opacity: 0; 
+  }
+}
+
+.coffee-steam {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  animation: steamRise 2s infinite ease-out;
+}
+
+.coffee-steam:nth-child(2) {
+  left: 40%;
+  animation-delay: 0.4s;
+  animation-duration: 2.2s;
+}
+
+.coffee-steam:nth-child(3) {
+  left: 60%;
+  animation-delay: 0.8s;
+  animation-duration: 1.8s;
+}
+
+@keyframes coffeeDrip {
+  0% { 
+    height: 0; 
+    opacity: 0.7; 
+  }
+  30% { 
+    height: 10px; 
+    opacity: 0.8; 
+  }
+  100% { 
+    height: 0; 
+    opacity: 0; 
+    transform: translateY(20px);
+  }
+}
+
+.coffee-drip {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 2px;
+  background: linear-gradient(to bottom, rgba(166, 124, 91, 0.8), rgba(166, 124, 91, 0.3));
+  border-radius: 50%;
+  transform-origin: top center;
+  animation: coffeeDrip 2s infinite ease-in;
+}
+
+.coffee-drip:nth-child(2) {
+  left: 45%;
+  animation-delay: 0.6s;
+}
+
+.coffee-drip:nth-child(3) {
+  left: 55%;
+  animation-delay: 1.2s;
+}
+
+@keyframes coffeeRipple {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.2);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.coffee-ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(166, 124, 91, 0.3), transparent);
+  transform: translate(-50%, -50%);
+  animation: coffeeRipple 2s infinite ease-out;
+}
+
+.coffee-ripple:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.coffee-ripple:nth-child(3) {
+  animation-delay: 1s;
+}
+
+.cafe-dark-mode {
+  color-scheme: dark;
+}

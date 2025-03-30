@@ -1,4 +1,5 @@
-// store/slices/uiSlice.js
+'use client'
+
 import { createSlice } from '@reduxjs/toolkit';
 
 const uiSlice = createSlice({

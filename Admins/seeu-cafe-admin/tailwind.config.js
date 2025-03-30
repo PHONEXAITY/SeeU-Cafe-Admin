@@ -16,7 +16,26 @@ module.exports = {
     },
     extend: {
       colors: {
-        // คงสีเดิมของคุณ
+        primary: {
+          light: '#F4ECE1', // Creamy latte
+          DEFAULT: '#C29A6B', // Rich cappuccino
+          dark: '#8A6D4B',   // Espresso
+        },
+        secondary: {
+          light: '#F8F4ED', // Milk foam
+          DEFAULT: '#E0D2BA', // Macchiato
+          dark: '#AB9F8D',   // Mocha
+        },
+        accent: {
+          light: '#E9DDD0', // Caramel
+          DEFAULT: '#D8BC9A', // Toffee
+          dark: '#9C6F49',   // Chocolate
+        },
+        neutral: {
+          light: '#FFFFFF', // White
+          DEFAULT: '#F7F5F2', // Cream
+          dark: '#352617',   // Dark coffee
+        },
         brown: {
           50: '#FAF3E0',
           100: '#F5E6CB',

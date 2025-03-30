@@ -4,42 +4,62 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FaEnvelope, FaLock } from 'react-icons/fa';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser, selectAuthLoading, selectIsAuthenticated, selectAuthInitialized, selectRedirectPath, clearRedirect } from '@/store/slices/authSlice';
 import { toast } from 'react-hot-toast';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({
     email: '',
     password: ''
   });
-  const { login, isAuthenticated } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  
+  const dispatch = useDispatch();
   const router = useRouter();
+  const isLoading = useSelector(selectAuthLoading);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isInitialized = useSelector(selectAuthInitialized);
+  const redirectPath = useSelector(selectRedirectPath);
 
-  // ใช้ useEffect เพื่อตั้งค่า global callback สำหรับการแสดงข้อผิดพลาดการเข้าสู่ระบบ
+  // Expose errors callback to window for API error handling
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.loginFormErrorsCallback = setErrors;
     }
     
     return () => {
-      // ทำความสะอาดเมื่อ component ถูก unmount
       if (typeof window !== 'undefined') {
         delete window.loginFormErrorsCallback;
       }
     };
   }, []);
 
-  // Redirect if already authenticated
+  // Debug logging
   useEffect(() => {
-    if (isAuthenticated()) {
-      console.log('User already authenticated in LoginPage, redirecting to dashboard...');
-      router.replace('/dashboard');
+    console.log('LoginPage state:', { isAuthenticated, isInitialized, isRedirecting, redirectPath });
+  }, [isAuthenticated, isInitialized, isRedirecting, redirectPath]);
+
+  // Handle redirect after authentication
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    if (isAuthenticated && !isRedirecting) {
+      if (redirectPath) {
+        console.log('Redirecting to:', redirectPath);
+        setIsRedirecting(true);
+        router.push(redirectPath);
+        dispatch(clearRedirect()); // Clear redirect path after use
+      } else {
+        console.log('User is authenticated, redirecting to dashboard...');
+        setIsRedirecting(true);
+        router.push('/dashboard');
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isRedirecting, redirectPath, router, isInitialized, dispatch]);
 
   const validateForm = () => {
     const newErrors = {
@@ -48,7 +68,7 @@ const LoginPage = () => {
     };
     let isValid = true;
 
-    // ตรวจสอบอีเมล
+    // Email validation
     if (!email) {
       newErrors.email = 'กรุณากรอกอีเมล';
       isValid = false;
@@ -57,7 +77,7 @@ const LoginPage = () => {
       isValid = false;
     }
 
-    // ตรวจสอบรหัสผ่าน
+    // Password validation
     if (!password) {
       newErrors.password = 'กรุณากรอกรหัสผ่าน';
       isValid = false;
@@ -69,41 +89,45 @@ const LoginPage = () => {
     setErrors(newErrors);
     return isValid;
   };
-// ในฟังก์ชัน handleSubmit ของ LoginPage
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!validateForm()) {
-    return;
-  }
-  
-  setErrors({
-    email: '',
-    password: ''
-  });
-  
-  setIsLoading(true);
-  
-  try {
-    console.log('Attempting login with:', { email });
-    const success = await login({ email, password, remember: rememberMe });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    if (success) {
-      // ใช้ window.location.href แทน router.push/replace ในกรณีที่ต้องการ force redirect
-      window.location.href = '/dashboard';
-    } else {
-      setIsLoading(false);
+    if (!validateForm()) {
+      return;
     }
-  } catch (error) {
-    setIsLoading(false);
-    console.error('Login error:', error);
-    toast.error(error.message || 'เข้าสู่ระบบล้มเหลว โปรดลองอีกครั้ง');
+    
+    setErrors({
+      email: '',
+      password: ''
+    });
+    
+    try {
+      console.log('Attempting login with:', { email });
+      await dispatch(loginUser({ email, password, remember: rememberMe })).unwrap();
+      toast.success('เข้าสู่ระบบสำเร็จ');
+      setIsRedirecting(true);
+    } catch (error) {
+      console.error('Login dispatch error:', error);
+      setIsRedirecting(false);
+    }
+  };
+
+  // ถ้ากำลัง redirect ให้แสดงข้อความ loading
+  if (isRedirecting) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <div className="text-center p-8 bg-white rounded-lg shadow-md">
+          <div className="animate-spin inline-block w-10 h-10 border-4 border-brown-600 border-t-transparent rounded-full mb-4"></div>
+          <p className="text-lg font-medium">กำลังนำคุณไปยังหน้าแดชบอร์ด...</p>
+        </div>
+      </div>
+    );
   }
-};
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat p-4 relative font-['Phetsarath_OT'] " 
-    style={{ backgroundImage: "url('./cafe(2).jpg')" }}>
+    style={{ backgroundImage: "url('/cafe.jpg')" }}>
       <div className="absolute inset-0 backdrop-blur-sm"></div>
       
       <div className="w-full max-w-md bg-white bg-opacity-80 rounded-xl shadow-2xl p-8 transition-all duration-300 ease-in-out hover:shadow-3xl relative overflow-hidden">
@@ -111,7 +135,7 @@ const handleSubmit = async (e) => {
         
         <div className="relative z-10">
           <div className="text-center">
-            <Image src="/logo (2).jpg" alt="SeeU Cafe Logo" width={100} height={100} className="mx-auto rounded-full shadow-lg" />
+            <Image src="/logo.png" alt="SeeU Cafe Logo" width={100} height={100} className="mx-auto rounded-full shadow-lg" priority/>
             <h2 className="mt-6 text-3xl font-extrabold text-brown-900">SeeU Cafe</h2>
             <p className="mt-2 text-sm text-brown-600">ເຂົ້າສູ່ລະບົບ Admin</p>
           </div>
@@ -192,7 +216,7 @@ const handleSubmit = async (e) => {
             <div className="flex">
               <button 
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isRedirecting}
                 className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-coffee-600 hover:border-brown-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-coffee-500 transition-all duration-300 ease-in-out"
               >
                 {isLoading ? (
@@ -210,7 +234,7 @@ const handleSubmit = async (e) => {
           
           <div className="mt-6 text-center text-sm">
             <p className="text-gray-600">
-              &copy; {new Date().getFullYear()} SeeU Cafe. All rights reserved.
+              © {new Date().getFullYear()} SeeU Cafe. All rights reserved.
             </p>
           </div>
         </div>
