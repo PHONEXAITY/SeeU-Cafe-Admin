@@ -69,6 +69,7 @@ const UserList = () => {
     try {
       // API handling is done within the modal using our hooks
       setEditModalOpen(false);
+      queryClient.invalidateQueries(['users']);
     } catch (error) {
       console.error('Update error:', error);
     }
@@ -97,6 +98,92 @@ const UserList = () => {
     setPage(1); // Reset to first page on limit change
   };
 
+  // Format user name based on first_name and last_name
+  const formatUserName = (user) => {
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    } else if (user.first_name) {
+      return user.first_name;
+    } else if (user.name) {
+      return user.name;
+    } else {
+      return 'N/A';
+    }
+  };
+
+  // ฟังก์ชันที่ปรับปรุงเพื่อดึงตำแหน่งล่าสุดของผู้ใช้
+const getUserRole = (user) => {
+  // กรณีที่มี roles เป็น array
+  if (Array.isArray(user.roles) && user.roles.length > 0) {
+    // สร้างสำเนาเพื่อไม่ให้กระทบข้อมูลต้นฉบับ
+    const sortedRoles = [...user.roles];
+    
+    // เรียงลำดับตาม assigned_at จากใหม่ไปเก่า (ล่าสุดอยู่แรก)
+    sortedRoles.sort((a, b) => {
+      const dateA = a.assigned_at || a.created_at || a.updatedAt || 0;
+      const dateB = b.assigned_at || b.created_at || b.updatedAt || 0;
+      return new Date(dateB) - new Date(dateA);
+    });
+    
+    // ดึงตำแหน่งล่าสุด (ตัวแรกหลังจากเรียงลำดับแล้ว)
+    const latestRole = sortedRoles[0];
+    
+    // ตรวจสอบว่าตำแหน่งเป็น object หรือไม่
+    if (typeof latestRole === 'object' && latestRole !== null) {
+      // ถ้ามี role property ใน object (กรณี join กับตาราง roles)
+      if (latestRole.role) {
+        return latestRole.role.name || latestRole.role;
+      }
+      // ถ้ามี name property
+      if (latestRole.name) {
+        return latestRole.name;
+      }
+      // ถ้ามีแค่ role_id
+      if (latestRole.role_id) {
+        return latestRole.role_id.toString();
+      }
+      // กรณีอื่นๆ ลองใช้ค่าใน object โดยตรง
+      return latestRole.toString();
+    }
+    
+    // ถ้า latestRole ไม่ใช่ object (เป็น string หรือค่าอื่นๆ)
+    return latestRole;
+  } 
+  
+  // กรณีมี roles เป็น object (จาก API บางรูปแบบ)
+  else if (user.roles && typeof user.roles === 'object' && !Array.isArray(user.roles)) {
+    return user.roles.name || Object.values(user.roles)[0] || 'user';
+  }
+  
+  // กรณีมี role โดยตรง (รูปแบบเก่า)
+  else if (user.role) {
+    if (typeof user.role === 'object') {
+      return user.role.name || user.role.id;
+    }
+    return user.role;
+  }
+  
+  // ไม่พบข้อมูลตำแหน่ง
+  return 'user'; // ค่าเริ่มต้น
+};
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('lo-LA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch (e) {
+      console.error('Date parsing error:', e);
+      return 'Invalid date';
+    }
+  };
+
   if (isUsersError) {
     return (
       <div className="text-center py-10">
@@ -105,6 +192,14 @@ const UserList = () => {
       </div>
     );
   }
+
+  // For debugging purposes
+  console.log('Users data:', usersData);
+
+  // Extract users from the response according to the API structure
+  const users = usersData?.users || usersData?.data || usersData || [];
+  const totalItems = usersData?.totalItems || usersData?.meta?.total || users.length || 0;
+  const totalPages = usersData?.totalPages || usersData?.meta?.lastPage || Math.ceil(totalItems / limit) || 1;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 md:p-6 font-['Phetsarath_OT']">
@@ -148,7 +243,7 @@ const UserList = () => {
             <option value="admin">ຜູ້ດູແລລະບົບ</option>
             <option value="manager">ຜູ້ຈັດການ</option>
             <option value="staff">ພະນັກງານ</option>
-            <option value="user">ຜູ້ໃຊ້ທົ່ວໄປ</option>
+            <option value="customer">ລູກຄ້າ</option>
           </select>
         </div>
 
@@ -193,7 +288,7 @@ const UserList = () => {
                   </div>
                 </td>
               </tr>
-            ) : usersData?.users?.length === 0 ? (
+            ) : users?.length === 0 ? (
               // Empty state
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center">
@@ -205,27 +300,32 @@ const UserList = () => {
               </tr>
             ) : (
               // Users list
-              usersData?.users?.map((user) => (
+              users?.map((user) => (
                 <tr key={user.id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                    <div className="text-sm font-medium text-gray-900">{formatUserName(user)}</div>
                     <div className="text-sm text-gray-500 sm:hidden">{user.email}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
                     <div className="text-sm text-gray-900">{user.email}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getUserRoleColor(user.role)}`}>
-                      {user.role}
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getUserRoleColor(getUserRole(user))}`}>
+                      {getUserRole(user)}
                     </span>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getUserStatusColor(user.status)}`}>
-                      {user.status}
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getUserStatusColor(user.status || 'active')}`}>
+                      {user.status || 'active'}
                     </span>
+                    {Array.isArray(user.roles) && user.roles.length > 1 && (
+                      <span className="ml-1 text-xs text-gray-500">
+                        +{user.roles.length - 1}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                    {new Date(user.createdAt).toLocaleDateString('lo-LA')}
+                    {formatDate(user.created_at || user.createdAt)}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button 
@@ -251,10 +351,10 @@ const UserList = () => {
       </div>
 
       {/* Pagination */}
-      {usersData?.totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
-            ສະແດງ {(page - 1) * limit + 1} ຫາ {Math.min(page * limit, usersData?.totalItems)} ຈາກທັງໝົດ {usersData?.totalItems} ຄົນ
+            ສະແດງ {(page - 1) * limit + 1} ຫາ {Math.min(page * limit, totalItems)} ຈາກທັງໝົດ {totalItems} ຄົນ
           </div>
           <div className="flex space-x-1">
             <Button
@@ -275,14 +375,14 @@ const UserList = () => {
             </Button>
             
             {/* Page numbers */}
-            {Array.from({ length: Math.min(5, usersData?.totalPages) }, (_, i) => {
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
-              if (usersData?.totalPages <= 5) {
+              if (totalPages <= 5) {
                 pageNum = i + 1;
               } else if (page <= 3) {
                 pageNum = i + 1;
-              } else if (page >= usersData?.totalPages - 2) {
-                pageNum = usersData?.totalPages - 4 + i;
+              } else if (page >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
               } else {
                 pageNum = page - 2 + i;
               }
@@ -301,15 +401,15 @@ const UserList = () => {
             
             <Button
               onClick={() => handlePageChange(page + 1)}
-              disabled={page === usersData?.totalPages}
+              disabled={page === totalPages}
               variant="outline"
               size="sm"
             >
               ›
             </Button>
             <Button
-              onClick={() => handlePageChange(usersData?.totalPages)}
-              disabled={page === usersData?.totalPages}
+              onClick={() => handlePageChange(totalPages)}
+              disabled={page === totalPages}
               variant="outline"
               size="sm"
             >

@@ -8,6 +8,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useCreateRole } from '@/hooks/rolesHooks';
+import { FaSpinner } from 'react-icons/fa';
 
 const AddRoleModal = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -16,22 +18,30 @@ const AddRoleModal = ({ isOpen, onClose, onSave }) => {
   });
 
   const [errors, setErrors] = useState({});
+  
+  // ใช้ hook useCreateRole
+  const createRoleMutation = useCreateRole();
 
   const availablePermissions = [
     'create_user',
     'edit_user',
     'delete_user',
     'manage_roles',
-    'view_users'
+    'view_users',
+    'manage_products',
+    'view_orders',
+    'manage_orders',
+    'view_reports',
+    'manage_settings'
   ];
 
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) {
-      newErrors.name = 'Role name is required';
+      newErrors.name = 'ຊື່ຂອງຕຳແໜ່ງຈຳເປັນຕ້ອງລະບຸ';
     }
     if (formData.permissions.length === 0) {
-      newErrors.permissions = 'At least one permission must be selected';
+      newErrors.permissions = 'ຕ້ອງເລືອກຢ່າງໜ້ອຍໜຶ່ງສິດທິ';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -52,18 +62,34 @@ const AddRoleModal = ({ isOpen, onClose, onSave }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSave(formData);
-      onClose();
-      // Reset form
-      setFormData({
-        name: '',
-        permissions: []
+      // ใช้ createRoleMutation จาก hook
+      createRoleMutation.mutate(formData, {
+        onSuccess: () => {
+          onClose();
+          if (onSave) onSave(formData);
+          // รีเซ็ตฟอร์ม
+          setFormData({
+            name: '',
+            permissions: []
+          });
+          setErrors({});
+        }
       });
     }
   };
 
+  const handleClose = () => {
+    onClose();
+    // รีเซ็ตฟอร์มเมื่อปิด
+    setFormData({
+      name: '',
+      permissions: []
+    });
+    setErrors({});
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px] font-['Phetsarath_OT']">
         <DialogHeader>
           <DialogTitle>ເພີ່ມຕຳແໜ່ງໃໝ່</DialogTitle>
@@ -117,19 +143,24 @@ const AddRoleModal = ({ isOpen, onClose, onSave }) => {
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => {
-                onClose();
-                setFormData({ name: '', permissions: [] });
-                setErrors({});
-              }}
+              onClick={handleClose}
+              disabled={createRoleMutation.isLoading}
             >
               ຍົກເລີກ
             </Button>
             <Button 
               type="submit" 
               className="bg-brown-600 hover:bg-brown-700 text-white"
+              disabled={createRoleMutation.isLoading}
             >
-              ສ້າງຕຳແໜ່ງ
+              {createRoleMutation.isLoading ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" />
+                  ກຳລັງສ້າງ...
+                </>
+              ) : (
+                'ສ້າງຕຳແໜ່ງ'
+              )}
             </Button>
           </DialogFooter>
         </form>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userService } from '@/services/usersApi';
+import { userService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
 // Hook to get all users with filters
@@ -10,6 +10,8 @@ export const useUsers = (filters = {}) => {
     queryKey: ['users', filters],
     queryFn: () => userService.getAllUsers(filters).then(res => res.data),
     keepPreviousData: true,
+    staleTime: 10000, // ลดเวลาให้สั้นลง (10 วินาที) เพื่อให้ข้อมูลรีเฟรชเร็วขึ้น
+    refetchOnWindowFocus: true, // รีเฟรชเมื่อกลับมาที่หน้าต่าง
   });
 };
 
@@ -30,11 +32,18 @@ export const useCreateUser = () => {
     mutationFn: (userData) => userService.createUser(userData),
     onSuccess: () => {
       // Invalidate and refetch users list
-      queryClient.invalidateQueries('users');
+      queryClient.invalidateQueries(['users']);
       toast.success('User created successfully');
     },
     onError: (error) => {
       console.error('Failed to create user:', error);
+      
+      // Log detailed error information for debugging
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      
       toast.error(error.response?.data?.message || 'Failed to create user');
     },
   });
@@ -45,16 +54,54 @@ export const useUpdateUser = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, userData }) => userService.updateUser(id, userData),
+    mutationFn: ({ id, userData }) => {
+      console.log('Updating user:', id, userData);
+      return userService.updateUser(id, userData);
+    },
     onSuccess: (_, variables) => {
-      // Invalidate and refetch users list and the individual user
-      queryClient.invalidateQueries('users');
+      // รีเฟรชข้อมูลทั้งหมดที่เกี่ยวข้องทันที
+      queryClient.invalidateQueries(['users']);
       queryClient.invalidateQueries(['user', variables.id]);
       toast.success('User updated successfully');
     },
     onError: (error) => {
       console.error('Failed to update user:', error);
-      toast.error(error.response?.data?.message || 'Failed to update user');
+      
+      // Log detailed error information for debugging
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        console.error('Error status:', error.response.status);
+        console.error('Error URL:', error.config?.url);
+        console.error('Error method:', error.config?.method);
+      }
+      
+      let errorMessage = 'Failed to update user';
+      
+      if (error.response?.status === 400 && Array.isArray(error.response.data.message)) {
+        errorMessage = error.response.data.message.join(', ');
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      toast.error(errorMessage);
+    },
+  });
+};
+
+// Hook to update user role
+export const useChangeUserRole = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ userId, roleId }) => userService.changeUserRole(userId, roleId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries(['users']);
+      queryClient.invalidateQueries(['user', variables.userId]);
+      toast.success('User role updated successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to change user role:', error);
+      toast.error(error.response?.data?.message || 'Failed to change user role');
     },
   });
 };
@@ -67,7 +114,7 @@ export const useDeleteUser = () => {
     mutationFn: (id) => userService.deleteUser(id),
     onSuccess: () => {
       // Invalidate and refetch users list
-      queryClient.invalidateQueries('users');
+      queryClient.invalidateQueries(['users']);
       toast.success('User deleted successfully');
     },
     onError: (error) => {
@@ -80,45 +127,9 @@ export const useDeleteUser = () => {
 // Hook to get user roles
 export const useUserRoles = () => {
   return useQuery({
-    queryKey: 'userRoles',
+    queryKey: ['userRoles'], // Changed from string to array
     queryFn: () => userService.getUserRoles().then(res => res.data),
     staleTime: 1000 * 60 * 30, // 30 minutes
-  });
-};
-
-// Hook to change user role
-export const useChangeUserRole = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, roleId }) => userService.changeUserRole(userId, roleId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries('users');
-      queryClient.invalidateQueries(['user', variables.userId]);
-      toast.success('User role updated successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to change user role:', error);
-      toast.error(error.response?.data?.message || 'Failed to change user role');
-    },
-  });
-};
-
-// Hook to update user status
-export const useUpdateUserStatus = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, status }) => userService.updateUserStatus(userId, status),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries('users');
-      queryClient.invalidateQueries(['user', variables.userId]);
-      toast.success(`User ${variables.status === 'active' ? 'activated' : 'deactivated'} successfully`);
-    },
-    onError: (error) => {
-      console.error('Failed to update user status:', error);
-      toast.error(error.response?.data?.message || 'Failed to update user status');
-    },
   });
 };
 
@@ -131,7 +142,7 @@ export const getUserRoleColor = (role) => {
       return 'bg-purple-100 text-purple-800';
     case 'staff':
       return 'bg-blue-100 text-blue-800';
-    case 'user':
+    case 'customer':
       return 'bg-green-100 text-green-800';
     default:
       return 'bg-gray-100 text-gray-800';

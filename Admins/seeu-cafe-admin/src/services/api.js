@@ -228,9 +228,44 @@ export const userService = {
   getAllUsers: (params) => api.get('/users', { params }),
   getUserById: (id) => api.get(`/users/${id}`),
   createUser: (userData) => api.post('/users', userData),
-  updateUser: (id, userData) => api.put(`/users/${id}`, userData),
+  updateUser: (id, userData) => api.patch(`/users/${id}`, userData),
   deleteUser: (id) => api.delete(`/users/${id}`),
-  getUserRoles: () => api.get('/roles')
+  getUserRoles: () => api.get('/roles'),
+  getUserRolesByUserId: (userId) => {
+    return api.get(`/roles/user/${userId}`);
+  },
+  changeUserRole: (userId, roleId) => {
+    console.log(`กำลังเปลี่ยนตำแหน่งสำหรับผู้ใช้ ${userId} เป็น ${roleId}`);
+    return api.post('/roles/assign', { 
+      userId: Number(userId), 
+      roleId: Number(roleId) 
+    });
+  },
+};
+export const roleService = {
+  // Get all roles
+  getAll: () => api.get('/roles'),
+  
+  // Get a specific role
+  getById: (id) => api.get(`/roles/${id}`),
+  
+  // Create a new role
+  create: (roleData) => api.post('/roles', roleData),
+  
+  // Update an existing role
+  update: (id, roleData) => api.patch(`/roles/${id}`, roleData),
+  
+  // Delete a role
+  delete: (id) => api.delete(`/roles/${id}`),
+  
+  // Assign role to user
+  assignToUser: (userId, roleId) => api.post('/roles/assign', { userId, roleId }),
+  
+  // Remove role from user
+  removeFromUser: (userId, roleId) => api.delete(`/roles/user/${userId}/role/${roleId}`),
+  
+  // Get user roles
+  getUserRoles: (userId) => api.get(`/roles/user/${userId}`),
 };
 
 // Analytics services

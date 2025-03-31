@@ -1,25 +1,28 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { userService } from '@/services/api'; // หรือ '@/services/usersApi' หากมีการแยกไฟล์
+import { userService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 import { FaSpinner } from 'react-icons/fa';
 
 const CreateUser = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
+    first_name: '',
+    last_name: '',
     email: '',
-    role: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phone: '',
+    address: '',
+    role: ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
 
-  // โหลดข้อมูลตำแหน่งจาก API
+  // Load roles from API
   useEffect(() => {
     const fetchRoles = async () => {
       setIsLoadingRoles(true);
@@ -37,35 +40,40 @@ const CreateUser = () => {
     fetchRoles();
   }, []);
 
-  // การตรวจสอบข้อมูล
+  // Form validation
   const validateForm = () => {
     const newErrors = {};
     
-    // ตรวจสอบชื่อผู้ใช้
-    if (!formData.name.trim()) {
-      newErrors.name = 'ກະລຸນາປ້ອນຊື່ຜູ້ໃຊ້';
+    // Check first name
+    if (!formData.first_name.trim()) {
+      newErrors.first_name = 'ກະລຸນາປ້ອນຊື່';
     }
     
-    // ตรวจสอบอีเมล
+    // Check last name
+    if (!formData.last_name.trim()) {
+      newErrors.last_name = 'ກະລຸນາປ້ອນນາມສະກຸນ';
+    }
+    
+    // Check email
     if (!formData.email.trim()) {
       newErrors.email = 'ກະລຸນາປ້ອນອີເມວ';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'ຮູບແບບອີເມວບໍ່ຖືກຕ້ອງ';
     }
     
-    // ตรวจสอบรหัสผ่าน
+    // Check password
     if (!formData.password) {
       newErrors.password = 'ກະລຸນາປ້ອນລະຫັດຜ່ານ';
     } else if (formData.password.length < 6) {
       newErrors.password = 'ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 6 ຕົວອັກສອນ';
     }
     
-    // ตรวจสอบการยืนยันรหัสผ่าน
+    // Check password confirmation
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'ລະຫັດຜ່ານບໍ່ກົງກັນ';
     }
     
-    // ตรวจสอบตำแหน่ง
+    // Check role if needed
     if (!formData.role) {
       newErrors.role = 'ກະລຸນາເລືອກຕຳແໜ່ງ';
     }
@@ -74,7 +82,7 @@ const CreateUser = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // การส่งฟอร์ม
+  // Form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -85,26 +93,39 @@ const CreateUser = () => {
     setIsSubmitting(true);
     
     try {
-      // สร้างข้อมูลผู้ใช้ใหม่สำหรับส่งไปยัง API
+      // Create user data object based on backend DTO requirements
       const userData = {
-        name: formData.name,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
         email: formData.email,
         password: formData.password,
-        role: formData.role
+        phone: formData.phone || null,
+        address: formData.address || null
       };
       
-      // เรียกใช้ API เพื่อสร้างผู้ใช้ใหม่
-      await userService.createUser(userData);
+      // Log request for debugging
+      console.log('Submitting user data:', userData);
       
-      // แสดงข้อความสำเร็จ
+      // Call API to create user
+      const response = await userService.createUser(userData);
+      console.log('User creation response:', response);
+      
+      // Show success message
       toast.success('ສ້າງຜູ້ໃຊ້ໃໝ່ສຳເລັດແລ້ວ');
       
-      // นำทางไปยังหน้ารายการผู้ใช้
+      // Navigate to users list
       router.push('/users/list');
     } catch (error) {
       console.error('Error creating user:', error);
       
-      // จัดการข้อผิดพลาดจาก API
+      // Log detailed error information
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+        console.error('Error response headers:', error.response.headers);
+      }
+      
+      // Handle API errors
       if (error.response?.data?.errors) {
         setErrors(error.response.data.errors);
       } else if (error.response?.data?.message) {
@@ -125,19 +146,37 @@ const CreateUser = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              ຊື່ຜູ້ໃຊ້
+              ຊື່
             </label>
             <input
               type="text"
               className={`w-full px-3 py-2 border rounded-md focus:ring-brown-500 focus:border-brown-500 ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
+                errors.first_name ? 'border-red-500' : 'border-gray-300'
               }`}
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.first_name}
+              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
               required
             />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+            {errors.first_name && (
+              <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ນາມສະກຸນ
+            </label>
+            <input
+              type="text"
+              className={`w-full px-3 py-2 border rounded-md focus:ring-brown-500 focus:border-brown-500 ${
+                errors.last_name ? 'border-red-500' : 'border-gray-300'
+              }`}
+              value={formData.last_name}
+              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+              required
+            />
+            {errors.last_name && (
+              <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
             )}
           </div>
           
@@ -161,6 +200,23 @@ const CreateUser = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              ເບີໂທລະສັບ
+            </label>
+            <input
+              type="tel"
+              className={`w-full px-3 py-2 border rounded-md focus:ring-brown-500 focus:border-brown-500 ${
+                errors.phone ? 'border-red-500' : 'border-gray-300'
+              }`}
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            />
+            {errors.phone && (
+              <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               ລະຫັດຜ່ານ
             </label>
             <input
@@ -179,7 +235,7 @@ const CreateUser = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-             ຍືນຍັນລະຫັດຜ່ານ
+              ຍືນຍັນລະຫັດຜ່ານ
             </label>
             <input
               type="password"
@@ -195,6 +251,23 @@ const CreateUser = () => {
             )}
           </div>
           
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ທີ່ຢູ່
+            </label>
+            <textarea
+              className={`w-full px-3 py-2 border rounded-md focus:ring-brown-500 focus:border-brown-500 ${
+                errors.address ? 'border-red-500' : 'border-gray-300'
+              }`}
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              rows="2"
+            />
+            {errors.address && (
+              <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+            )}
+          </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               ຕຳແໜ່ງ
@@ -205,7 +278,6 @@ const CreateUser = () => {
               }`}
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              required
               disabled={isLoadingRoles}
             >
               <option value="">ກະລຸນາເລືອກຕຳແໜ່ງ</option>
@@ -221,8 +293,8 @@ const CreateUser = () => {
                 ) : (
                   <>
                     <option value="admin">ຜູ້ດູແລລະບົບ (Admin)</option>
-                    <option value="user">ພະນັກງານທົ່ວໄປ</option>
-                    <option value="editor">ຜູ້ບໍລິຫານ</option>
+                    <option value="staff">ພະນັກງານທົ່ວໄປ</option>
+                    <option value="customer">ລູກຄ້າ</option>
                   </>
                 )
               )}
