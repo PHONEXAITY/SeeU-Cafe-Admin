@@ -1,161 +1,94 @@
-'use client'
-
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+// src/hooks/orderHooks.js
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { orderService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
-// Get all orders with filters
+// Hook สำหรับดึงข้อมูลคำสั่งซื้อทั้งหมด
 export const useOrders = (filters = {}) => {
-  return useQuery(
-    ['orders', filters],
-    () => orderService.getAllOrders(filters).then(res => res.data),
-    {
-      keepPreviousData: true,
-      staleTime: 1000 * 60 * 2, // 2 minutes (shorter stale time for orders)
-    }
-  );
+  return useQuery({
+    queryKey: ['orders', filters],
+    queryFn: () => orderService.getAllOrders(filters).then(res => res.data),
+    keepPreviousData: true,
+    staleTime: 1000 * 60 * 2, // 2 นาที
+  });
 };
 
-// Get a single order by ID
+// Hook สำหรับดึงข้อมูลคำสั่งซื้อเดียว
 export const useOrder = (id) => {
-  return useQuery(
-    ['order', id],
-    () => orderService.getOrderById(id).then(res => res.data),
-    {
-      enabled: !!id, // Only run if ID exists
-    }
-  );
+  return useQuery({
+    queryKey: ['order', id],
+    queryFn: () => orderService.getOrderById(id).then(res => res.data),
+    enabled: !!id, // ทำงานเมื่อมี ID เท่านั้น
+  });
 };
 
-// Update order status
-export const useUpdateOrderStatus = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation(
-    ({ id, status }) => orderService.updateOrderStatus(id, status),
-    {
-      onSuccess: (_, variables) => {
-        // Invalidate and refetch orders list and the individual order
-        queryClient.invalidateQueries('orders');
-        queryClient.invalidateQueries(['order', variables.id]);
-        toast.success(`Order status updated to ${variables.status}`);
-      },
-      onError: (error) => {
-        console.error('Failed to update order status:', error);
-        toast.error(error.response?.data?.message || 'Failed to update order status');
-      },
-    }
-  );
-};
-
-// Create a new order
+// Hook สำหรับสร้างคำสั่งซื้อใหม่
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
   
-  return useMutation(
-    (orderData) => orderService.createOrder(orderData),
-    {
-      onSuccess: () => {
-        // Invalidate and refetch orders list
-        queryClient.invalidateQueries('orders');
-        toast.success('Order created successfully');
-      },
-      onError: (error) => {
-        console.error('Failed to create order:', error);
-        toast.error(error.response?.data?.message || 'Failed to create order');
-      },
-    }
-  );
+  return useMutation({
+    mutationFn: (orderData) => orderService.createOrder(orderData),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['orders']);
+      toast.success('สร้างคำสั่งซื้อสำเร็จ');
+    },
+    onError: (error) => {
+      console.error('Failed to create order:', error);
+      toast.error(error.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ');
+    },
+  });
 };
 
-// Delete an order
+// Hook สำหรับอัพเดทสถานะคำสั่งซื้อ
+export const useUpdateOrderStatus = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, status }) => orderService.updateOrderStatus(id, status),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries(['orders']);
+      queryClient.invalidateQueries(['order', variables.id]);
+      toast.success(`อัพเดทสถานะคำสั่งซื้อเป็น ${variables.status} สำเร็จ`);
+    },
+    onError: (error) => {
+      console.error('Failed to update order status:', error);
+      toast.error(error.response?.data?.message || 'เกิดข้อผิดพลาดในการอัพเดทสถานะคำสั่งซื้อ');
+    },
+  });
+};
+
+// Hook สำหรับลบคำสั่งซื้อ
 export const useDeleteOrder = () => {
   const queryClient = useQueryClient();
   
-  return useMutation(
-    (id) => orderService.deleteOrder(id),
-    {
-      onSuccess: () => {
-        // Invalidate and refetch orders list
-        queryClient.invalidateQueries('orders');
-        toast.success('Order deleted successfully');
-      },
-      onError: (error) => {
-        console.error('Failed to delete order:', error);
-        toast.error(error.response?.data?.message || 'Failed to delete order');
-      },
-    }
-  );
+  return useMutation({
+    mutationFn: (id) => orderService.deleteOrder(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['orders']);
+      toast.success('ลบคำสั่งซื้อสำเร็จ');
+    },
+    onError: (error) => {
+      console.error('Failed to delete order:', error);
+      toast.error(error.response?.data?.message || 'เกิดข้อผิดพลาดในการลบคำสั่งซื้อ');
+    },
+  });
 };
 
-// Helper function to get order status color
-export const getOrderStatusColor = (status) => {
-  switch (status.toLowerCase()) {
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'processing':
-      return 'bg-blue-100 text-blue-800';
-    case 'shipped':
-      return 'bg-purple-100 text-purple-800';
-    case 'delivered':
-      return 'bg-green-100 text-green-800';
-    case 'cancelled':
-      return 'bg-red-100 text-red-800';
-    case 'refunded':
-      return 'bg-gray-100 text-gray-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
-
-// Helper function to get payment status color
-export const getPaymentStatusColor = (status) => {
-  switch (status.toLowerCase()) {
-    case 'paid':
-      return 'bg-green-100 text-green-800';
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'failed':
-      return 'bg-red-100 text-red-800';
-    case 'refunded':
-      return 'bg-purple-100 text-purple-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
-
-// Order status options for dropdown
+// Helper สำหรับจัดการสถานะคำสั่งซื้อ
 export const orderStatusOptions = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'shipped', label: 'Shipped' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'refunded', label: 'Refunded' },
+  { value: 'pending', label: 'รอดำเนินการ' },
+  { value: 'processing', label: 'กำลังจัดทำ' },
+  { value: 'ready', label: 'พร้อมส่งมอบ' },
+  { value: 'delivered', label: 'ส่งมอบแล้ว' },
+  { value: 'cancelled', label: 'ยกเลิก' }
 ];
 
-// Payment status options for dropdown
-export const paymentStatusOptions = [
-  { value: 'paid', label: 'Paid' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'refunded', label: 'Refunded' },
-];
-
-// Payment method options for dropdown
-export const paymentMethodOptions = [
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'qr_code', label: 'QR Code' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'cash_on_delivery', label: 'Cash on Delivery' },
-  { value: 'promptpay', label: 'PromptPay' },
-];
-
-// Format currency with Thai Baht
+// Helper สำหรับแปลงสกุลเงิน
 export const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('th-TH', {
+  return new Intl.NumberFormat('lo-LA', {
     style: 'currency',
-    currency: 'THB',
-    minimumFractionDigits: 2,
+    currency: 'LAK',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(amount);
 };

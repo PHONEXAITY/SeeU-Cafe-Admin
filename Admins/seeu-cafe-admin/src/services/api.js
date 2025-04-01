@@ -3,7 +3,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-// Create axios instance with default config
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
   timeout: 10000,
@@ -11,10 +10,9 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: true, // ตั้งค่านี้เป็น true เพื่อส่ง cookies ไปกลับ server
+  withCredentials: true, 
 });
 
-// Helper to get token from cookies (only on client)
 const getToken = () => {
   if (typeof window !== 'undefined') {
     return Cookies.get('auth_token');
@@ -55,21 +53,8 @@ export const setLoadingCallbacks = (callbacks) => {
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // เริ่ม loading (จากทั้ง Redux และ LoadingContext)
-    if (typeof window !== 'undefined') {
-      // ใช้ Redux dispatch ถ้ามี
-      if (dispatchFunction && startLoadingAction) {
-        dispatchFunction(startLoadingAction());
-      }
-      
-      // ใช้ LoadingContext callback
-      if (loadingCallbacks.startLoading) {
-        loadingCallbacks.startLoading();
-      }
-    }
+    // Start loading...
     
-    // You might not need this if you're using withCredentials
-    // but keeping it as a fallback for compatibility
     const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -78,142 +63,168 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    // หยุด loading (จากทั้ง Redux และ LoadingContext)
-    if (typeof window !== 'undefined') {
-      // ใช้ Redux dispatch ถ้ามี
-      if (dispatchFunction && stopLoadingAction) {
-        dispatchFunction(stopLoadingAction());
-      }
-      
-      // ใช้ LoadingContext callback
-      if (loadingCallbacks.stopLoading) {
-        loadingCallbacks.stopLoading();
-      }
-    }
-    
-    console.error('API Request Error:', error);
+    // Stop loading...
     return Promise.reject(error);
   }
 );
 
-// Response interceptor
 api.interceptors.response.use(
   (response) => {
-    // หยุด loading (จากทั้ง Redux และ LoadingContext)
-    if (typeof window !== 'undefined') {
-      // ใช้ Redux dispatch ถ้ามี
-      if (dispatchFunction && stopLoadingAction) {
-        dispatchFunction(stopLoadingAction());
-      }
-      
-      // ใช้ LoadingContext callback
-      if (loadingCallbacks.stopLoading) {
-        loadingCallbacks.stopLoading();
-      }
-    }
-    
     return response;
   },
   (error) => {
-    // หยุด loading (จากทั้ง Redux และ LoadingContext)
-    if (typeof window !== 'undefined') {
-      // ใช้ Redux dispatch ถ้ามี
-      if (dispatchFunction && stopLoadingAction) {
-        dispatchFunction(stopLoadingAction());
+    
+    if (error.response) {
+      switch (error.response.status) {
+        case 401:
+          if (dispatchFunction && logoutAction) {
+            console.log('401 Unauthorized: Logging out...');
+            dispatchFunction(logoutAction());
+          }
+          break;
+          
+        case 403:
+          console.error('403 Forbidden: No permission');
+          toast?.error('ไม่มีสิทธิ์ในการเข้าถึง');
+          break;
+          
+        case 404:
+          console.error('404 Not Found:', error.config?.url);
+          break;
+          
+        case 422:
+          console.error('422 Validation Error:', error.response.data);
+          break;
+          
+        case 500:
+          console.error('500 Server Error');
+          toast?.error('เกิดข้อผิดพลาดที่เซิร์ฟเวอร์');
+          break;
       }
-      
-      // ใช้ LoadingContext callback
-      if (loadingCallbacks.stopLoading) {
-        loadingCallbacks.stopLoading();
-      }
-      
-      // Handle 401 Unauthorized responses
-      if (error.response && error.response.status === 401 && dispatchFunction && logoutAction) {
-        dispatchFunction(logoutAction());
-      }
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+      toast?.error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+    } else {
+      console.error('Request setup error:', error.message);
     }
     
     return Promise.reject(error);
   }
 );
 
-// Auth services
 export const authService = {
   login: (credentials) => {
-    const { email, password } = credentials;
-    const loginData = { email, password };
-    
-    console.log('Calling login API with:', loginData);
-    return api.post('/auth/login', loginData)
+    return api.post('/auth/login', credentials)
       .then(response => {
-        // บันทึก token ใน cookie ถ้ามาจาก response
+        // เก็บ token ใน cookie
         if (response.data && response.data.access_token) {
-          Cookies.set('auth_token', response.data.access_token, { expires: 7, path: '/' });
+          Cookies.set('auth_token', response.data.access_token, { expires: 7 });
         }
         return response;
-      })
-      .catch(error => {
-        console.error('Login error details:', error);
-        
-        if (error.response) {
-          console.error(`Login error [${error.response.status}]:`, error.response.data);
-          
-          if (error.response.status === 401) {
-            error.message = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-          } else if (error.response.status === 403) {
-            error.message = 'ไม่มีสิทธิ์เข้าถึงระบบ';
-          }
-        } else if (error.request) {
-          // คำขอถูกส่งแต่ไม่ได้รับการตอบกลับ
-          console.error('No response received:', error.request);
-          error.message = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
-        } else {
-          // เกิดข้อผิดพลาดในการตั้งค่าคำขอ
-          console.error('Request setup error:', error.message);
-        }
-        
-        throw error;
       });
   },
+  
   logout: () => {
     return api.post('/auth/logout')
       .then(response => {
         // ลบ token จาก cookie
-        Cookies.remove('auth_token', { path: '/' });
+        Cookies.remove('auth_token');
         return response;
       });
   },
-  register: (userData) => {
-    return api.post('/auth/register', userData)
-      .then(response => {
-        // บันทึก token ใน cookie ถ้ามาจาก response
-        if (response.data && response.data.access_token) {
-          Cookies.set('auth_token', response.data.access_token, { expires: 7, path: '/' });
-        }
-        return response;
-      });
-  },
+  
   getProfile: () => api.get('/auth/profile'),
-  updateProfile: (userData) => api.put('/auth/profile', userData),
-  changePassword: (passwordData) => api.post('/auth/change-password', passwordData)
+  
+  // เพิ่มฟังก์ชัน verify token
+  verifyToken: () => api.get('/auth/verify')
 };
-
-
-// Product services
 export const productService = {
-  getAllProducts: (params) => api.get('/products', { params }),
-  getProductById: (id) => api.get(`/products/${id}`),
-  createProduct: (productData) => api.post('/products', productData),
-  updateProduct: (id, productData) => api.put(`/products/${id}`, productData),
-  deleteProduct: (id) => api.delete(`/products/${id}`),
-  getCategories: () => api.get('/categories'),
-  uploadImage: (formData) => api.post('/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
+  getAllFoodProducts: async (params = {}) => {
+    try {
+      const response = await api.get('/food-menu', { params });
+      return response.data || { products: [], totalItems: 0, totalPages: 0 }; // Default ค่า
+    } catch (error) {
+      console.error('Get Food Products Error:', error);
+      return { products: [], totalItems: 0, totalPages: 0, error: error.message };
     }
-  })
-};
+  },
 
+  getAllBeverageProducts: async (params = {}) => {
+    try {
+      const response = await api.get('/beverage-menu', { params });
+      return response.data || { products: [], totalItems: 0, totalPages: 0 }; // Default ค่า
+    } catch (error) {
+      console.error('Get Beverage Products Error:', error);
+      return { products: [], totalItems: 0, totalPages: 0, error: error.message };
+    }
+  },
+
+  getCategories: async () => {
+    try {
+      const response = await api.get('/menu-categories');
+      return response.data || []; // Default เป็น array ว่าง
+    } catch (error) {
+      console.error('Get Categories Error:', error);
+      return []; // คืนค่า array ว่างถ้าล้มเหลว
+    }
+  },
+
+  // ฟังก์ชันอื่นๆ คงเดิม แต่ควรเพิ่ม try-catch ถ้ายังไม่มี
+  getFoodProductById: async (id) => {
+    try {
+      const response = await api.get(`/food-menu/${id}`);
+      return response.data || {};
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+
+  getBeverageProductById: async (id) => {
+    try {
+      const response = await api.get(`/beverage-menu/${id}`);
+      return response.data || {};
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+
+  createFoodProduct: async (productData) => {
+    const response = await api.post('/food-menu', productData);
+    return response.data;
+  },
+
+  updateFoodProduct: async (id, productData) => {
+    const response = await api.put(`/food-menu/${id}`, productData);
+    return response.data;
+  },
+
+  deleteFoodProduct: async (id) => {
+    const response = await api.delete(`/food-menu/${id}`);
+    return response.data;
+  },
+
+  createBeverageProduct: async (productData) => {
+    const response = await api.post('/beverage-menu', productData);
+    return response.data;
+  },
+
+  updateBeverageProduct: async (id, productData) => {
+    const response = await api.put(`/beverage-menu/${id}`, productData);
+    return response.data;
+  },
+
+  deleteBeverageProduct: async (id) => {
+    const response = await api.delete(`/beverage-menu/${id}`);
+    return response.data;
+  },
+
+  uploadImage: async (formData) => {
+    const response = await api.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+};
 // Order services
 export const orderService = {
   getAllOrders: (params) => api.get('/orders', { params }),

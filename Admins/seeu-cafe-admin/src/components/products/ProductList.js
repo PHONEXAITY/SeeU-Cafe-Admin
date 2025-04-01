@@ -1,343 +1,452 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { 
-  FaPlus, FaEdit, FaTrash, FaSearch, FaFilter, 
-  FaSortAmountDown, FaSortAmountUp, FaEye, FaSpinner,
-  FaChevronLeft, FaChevronRight, FaAngleDoubleLeft, FaAngleDoubleRight
-} from 'react-icons/fa';
-import { useProducts, useDeleteProduct, useCategories } from '@/hooks/productHooks';
-import { formatCurrency } from '@/hooks/orderHooks';
+import {
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Loader2,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import {
+  useFoodProducts,
+  useBeverageProducts,
+  useDeleteFoodProduct,
+  useDeleteBeverageProduct,
+  useCategories,
+  formatCurrency,
+  getProductStatusColor,
+} from '@/hooks/productHooks';
+import { productService } from '@/services/api';
 import { toast } from 'react-hot-toast';
+
+// Import the custom UI components
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogFooter,
+  DialogTitle,
+  DialogDescription 
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 const ProductList = () => {
   // State for filters and pagination
+  const [productType, setProductType] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('');
-  const [sortField, setSortField] = useState('createdAt');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [categoryId, setCategoryId] = useState('');
+  const [status, setStatus] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+
+  // State for modals
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [productToEdit, setProductToEdit] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
+
+  // State for form data
+  const [formData, setFormData] = useState({
+    type: 'food',
+    name: '',
+    price: '',
+    category_id: '',
+    status: 'active',
+    description: '',
+    image: null,
+    hot_price: '',
+    ice_price: '',
+  });
 
   const router = useRouter();
 
-  // Build filter object for API
-  const filters = {
-    search: searchTerm,
-    category,
-    sortBy: sortField,
-    sortDir: sortDirection,
-    page,
-    limit,
-  };
+  // Fetch data
+  const filters = { search: searchTerm, categoryId: categoryId || undefined, status: status || undefined, sortBy: sortField, sortDir: sortDirection, page, limit };
+  const { data: foodData, isLoading: isLoadingFood, error: foodError } = useFoodProducts(productType === 'all' || productType === 'food' ? filters : null);
+  const { data: beverageData, isLoading: isLoadingBeverage, error: beverageError } = useBeverageProducts(productType === 'all' || productType === 'beverage' ? filters : null);
+  const { data: categoriesData, isLoading: isLoadingCategories } = useCategories();
+  const { mutate: deleteFoodProduct, isLoading: isDeletingFood } = useDeleteFoodProduct();
+  const { mutate: deleteBeverageProduct, isLoading: isDeletingBeverage } = useDeleteBeverageProduct();
 
-  // Fetch products with filters
-  const { 
-    data: productsData, 
-    isLoading: isLoadingProducts,
-    isError: isProductsError,
-    error: productsError
-  } = useProducts(filters);
+  // Combine products
+  const products = [];
+  const isLoadingProducts = isLoadingFood || isLoadingBeverage;
+  const hasProductsError = foodError || beverageError;
 
-  // Fetch categories for filter dropdown
-  const { 
-    data: categoriesData, 
-    isLoading: isLoadingCategories 
-  } = useCategories();
-
-  // Delete product mutation
-  const { mutate: deleteProduct, isLoading: isDeleting } = useDeleteProduct();
-
-  // Handle search input changes
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    setPage(1); // Reset to first page on new search
-  };
-
-  // Handle category filter changes
-  const handleCategoryChange = (e) => {
-    setCategory(e.target.value);
-    setPage(1); // Reset to first page on new filter
-  };
-
-  // Handle sort changes
-  const handleSortChange = (field) => {
-    if (field === sortField) {
-      // Toggle direction if same field
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Default to desc for new field
-      setSortField(field);
-      setSortDirection('desc');
+  if (!isLoadingProducts && !hasProductsError) {
+    if (productType === 'all' || productType === 'food') {
+      const foodProducts = foodData?.products || [];
+      products.push(...foodProducts.map((product) => ({ ...product, type: 'food' })));
     }
-    setPage(1); // Reset to first page on new sort
+    if (productType === 'all' || productType === 'beverage') {
+      const beverageProducts = beverageData?.products || [];
+      products.push(...beverageProducts.map((product) => ({ ...product, type: 'beverage' })));
+    }
+  }
+
+  products.sort((a, b) => {
+    let compareA = a[sortField];
+    let compareB = b[sortField];
+    if (typeof compareA === 'string') compareA = compareA.toLowerCase();
+    if (typeof compareB === 'string') compareB = compareB.toLowerCase();
+    return sortDirection === 'asc' ? (compareA < compareB ? -1 : 1) : (compareA > compareB ? -1 : 1);
+  });
+
+  const totalItems = (productType === 'all' || productType === 'food' ? foodData?.totalItems || 0 : 0) + (productType === 'all' || productType === 'beverage' ? beverageData?.totalItems || 0 : 0);
+  const totalPages = Math.max(productType === 'all' || productType === 'food' ? foodData?.totalPages || 0 : 0, productType === 'all' || productType === 'beverage' ? beverageData?.totalPages || 0 : 0);
+
+  // Handlers
+  const handleSearchChange = (e) => { setSearchTerm(e.target.value); setPage(1); };
+  const handleCategoryChange = (value) => { setCategoryId(value); setPage(1); };
+  const handleStatusChange = (value) => { setStatus(value); setPage(1); };
+  const handleProductTypeChange = (value) => { setProductType(value); setPage(1); };
+  const handleSortChange = (field) => {
+    setSortField(field);
+    setSortDirection(sortField === field && sortDirection === 'asc' ? 'desc' : 'asc');
+    setPage(1);
+  };
+  const handlePageChange = (newPage) => setPage(newPage);
+  const handleLimitChange = (value) => { setLimit(Number(value)); setPage(1); };
+
+  const getCategoryName = (categoryId) => {
+    if (!categoriesData) return 'Loading...';
+    const categories = Array.isArray(categoriesData) ? categoriesData : categoriesData.data || [];
+    const category = categories.find((cat) => cat.id === categoryId);
+    return category ? category.name : 'Unknown';
   };
 
-  // Navigate to add product page
+  // Modal Handlers
   const handleAddProduct = () => {
-    router.push('/products/add');
+    setFormData({ type: 'food', name: '', price: '', category_id: '', status: 'active', description: '', image: null, hot_price: '', ice_price: '' });
+    setShowAddModal(true);
   };
 
-  // Navigate to edit product page
-  const handleEditProduct = (id) => {
-    router.push(`/products/edit/${id}`);
+  const handleEditProduct = (product) => {
+    setProductToEdit(product);
+    setFormData({
+      type: product.type,
+      name: product.name,
+      price: product.price || '',
+      category_id: product.category_id || '',
+      status: product.status || 'active',
+      description: product.description || '',
+      image: product.image || null,
+      hot_price: product.hot_price || '',
+      ice_price: product.ice_price || '',
+    });
+    setShowEditModal(true);
   };
 
-  // Navigate to view product page
-  const handleViewProduct = (id) => {
-    router.push(`/products/${id}`);
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle delete confirmation
+  const handleSelectChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageChange = (file) => {
+    setFormData((prev) => ({ ...prev, image: file }));
+  };
+
+  const handleSubmitAdd = async (e) => {
+    e.preventDefault();
+    const data = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (formData[key]) data.append(key, formData[key]);
+    });
+
+    try {
+      if (formData.type === 'food') {
+        await productService.createFoodProduct(data);
+        toast.success('ເພີ່ມສິນຄ້າອາຫານສຳເລັດ');
+      } else {
+        await productService.createBeverageProduct(data);
+        toast.success('ເພີ່ມສິນຄ້າເຄື່ອງດື່ມສຳເລັດ');
+      }
+      setShowAddModal(false);
+    } catch (error) {
+      toast.error(`ເພີ່ມສິນຄ້າລົ້ມເຫລວ: ${error.message}`);
+    }
+  };
+
+  const handleSubmitEdit = async (e) => {
+    e.preventDefault();
+    const data = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (formData[key]) data.append(key, formData[key]);
+    });
+
+    try {
+      if (formData.type === 'food') {
+        await productService.updateFoodProduct(productToEdit.id, data);
+        toast.success('ແກ້ໄຂສິນຄ້າອາຫານສຳເລັດ');
+      } else {
+        await productService.updateBeverageProduct(productToEdit.id, data);
+        toast.success('ແກ້ໄຂສິນຄ້າເຄື່ອງດື່ມສຳເລັດ');
+      }
+      setShowEditModal(false);
+    } catch (error) {
+      toast.error(`ແກ້ໄຂສິນຄ້າລົ້ມເຫລວ: ${error.message}`);
+    }
+  };
+
   const confirmDelete = (product) => {
     setProductToDelete(product);
     setShowDeleteModal(true);
   };
 
-  // Handle actual deletion
   const handleDeleteConfirmed = () => {
-    if (productToDelete) {
-      deleteProduct(productToDelete.id, {
-        onSuccess: () => {
-          setShowDeleteModal(false);
-          setProductToDelete(null);
-        }
-      });
-    }
+    if (!productToDelete) return;
+    const deleteFn = productToDelete.type === 'food' ? deleteFoodProduct : deleteBeverageProduct;
+    deleteFn(productToDelete.id, {
+      onSuccess: () => {
+        setShowDeleteModal(false);
+        setProductToDelete(null);
+        toast.success(productToDelete.type === 'food' ? 'ລຶບສິນຄ້າອາຫານສຳເລັດ' : 'ລຶບສິນຄ້າເຄື່ອງດື່ມສຳເລັດ');
+      },
+      onError: (error) => toast.error(`ລຶບສິນຄ້າລົ້ມເຫລວ: ${error.message}`),
+    });
   };
 
-  // Handle cancel delete
-  const handleCancelDelete = () => {
-    setShowDeleteModal(false);
-    setProductToDelete(null);
-  };
+  const handleViewProduct = (product) => router.push(`/products/${product.type}/${product.id}`);
 
-  // Handle page change
-  const handlePageChange = (newPage) => {
-    setPage(newPage);
-  };
-
-  // Handle limit change
-  const handleLimitChange = (e) => {
-    setLimit(Number(e.target.value));
-    setPage(1); // Reset to first page on limit change
-  };
-
-  if (isProductsError) {
+  // Status badge renderer
+  const renderStatusBadge = (status) => {
+    const bgColor = status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
     return (
-      <div className="text-center py-10">
-        <h2 className="text-xl text-red-600 mb-2">Error loading products</h2>
-        <p className="text-gray-600">{productsError?.message || 'Please try again later'}</p>
-      </div>
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${bgColor}`}>
+        {status === 'active' ? 'ເປີດໃຊ້ງານ' : 'ປິດໃຊ້ງານ'}
+      </span>
     );
-  }
+  };
+
+  // Category options for select
+  const categoryOptions = categoriesData ? 
+    (Array.isArray(categoriesData) ? categoriesData : categoriesData.data || []).map(category => ({
+      value: category.id,
+      label: category.name
+    })) : [];
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-4 sm:mb-0">Products</h1>
-        <button
-          onClick={handleAddProduct}
-          className="flex items-center px-4 py-2 bg-brown-600 text-white rounded-md hover:bg-brown-700 transition-colors"
+    <div className="bg-white rounded-lg shadow-lg p-6 font-['Phetsarath_OT']">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-4">
+        <h1 className="text-2xl font-semibold text-gray-800 mb-4 sm:mb-0">ສິນຄ້າທັງໝົດ</h1>
+        <Button onClick={handleAddProduct} className="bg-amber-700 hover:bg-amber-800">
+          <Plus className="mr-2 h-4 w-4" /> ເພີ່ມສິນຄ້າ
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="relative">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input 
+              type="text" 
+              className="pl-8" 
+              placeholder="ຄົ້ນຫາສິນຄ້າ..." 
+              value={searchTerm} 
+              onChange={handleSearchChange} 
+            />
+          </div>
+        </div>
+        
+        <Select 
+          value={productType} 
+          onValueChange={handleProductTypeChange}
         >
-          <FaPlus className="mr-2" />
-          Add Product
-        </button>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Search */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FaSearch className="text-gray-400" />
-          </div>
-          <input
-            type="text"
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-brown-500 focus:border-brown-500"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
-        </div>
-
-        {/* Category Filter */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FaFilter className="text-gray-400" />
-          </div>
-          <select
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-brown-500 focus:border-brown-500"
-            value={category}
-            onChange={handleCategoryChange}
-            disabled={isLoadingCategories}
-          >
-            <option value="">All Categories</option>
-            {categoriesData?.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
+          <SelectTrigger>
+            <Filter className="mr-2 h-4 w-4 text-gray-400" />
+            <SelectValue placeholder="ເລືອກປະເພດສິນຄ້າ">
+              {productType === 'all' ? 'ທຸກປະເພດ' : 
+               productType === 'food' ? 'ອາຫານ' : 'ເຄື່ອງດື່ມ'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">ທຸກປະເພດ</SelectItem>
+            <SelectItem value="food">ອາຫານ</SelectItem>
+            <SelectItem value="beverage">ເຄື່ອງດື່ມ</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <Select 
+          value={categoryId} 
+          onValueChange={handleCategoryChange}
+          disabled={isLoadingCategories}
+        >
+          <SelectTrigger>
+            <Filter className="mr-2 h-4 w-4 text-gray-400" />
+            <SelectValue placeholder="ເລືອກໝວດໝູ່">
+              {categoryId ? getCategoryName(categoryId) : 'ທຸກໝວດໝູ່'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">ທຸກໝວດໝູ່</SelectItem>
+            {categoryOptions.map(category => (
+              <SelectItem key={category.value} value={category.value}>
+                {category.label}
+              </SelectItem>
             ))}
-          </select>
-        </div>
-
-        {/* Items per page */}
-        <div className="flex items-center">
-          <span className="text-gray-600 mr-2">Show:</span>
-          <select
-            className="border border-gray-300 rounded-md focus:outline-none focus:ring-brown-500 focus:border-brown-500 p-2"
-            value={limit}
-            onChange={handleLimitChange}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
-          <span className="text-gray-600 ml-2">per page</span>
-        </div>
+          </SelectContent>
+        </Select>
+        
+        <Select 
+          value={status} 
+          onValueChange={handleStatusChange}
+        >
+          <SelectTrigger>
+            <Filter className="mr-2 h-4 w-4 text-gray-400" />
+            <SelectValue placeholder="ເລືອກສະຖານະ">
+              {status === 'active' ? 'ເປີດໃຊ້ງານ' : 
+               status === 'inactive' ? 'ປິດໃຊ້ງານ' : 'ທຸກສະຖານະ'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">ທຸກສະຖານະ</SelectItem>
+            <SelectItem value="active">ເປີດໃຊ້ງານ</SelectItem>
+            <SelectItem value="inactive">ປິດໃຊ້ງານ</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Products Table */}
-      <div className="overflow-x-auto mb-6">
+      {/* Table */}
+      <div className="overflow-x-auto mb-6 rounded-lg border">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="px-4 py-2 text-left">Image</th>
+            <tr className="bg-gray-50">
+              <th className="px-4 py-3 text-left font-medium text-gray-600">ຮູບພາບ</th>
               <th 
-                className="px-4 py-2 text-left cursor-pointer"
+                className="px-4 py-3 text-left font-medium text-gray-600 cursor-pointer" 
                 onClick={() => handleSortChange('name')}
               >
                 <div className="flex items-center">
-                  <span>Name</span>
+                  ຊື່ສິນຄ້າ 
                   {sortField === 'name' && (
-                    sortDirection === 'asc' ? <FaSortAmountUp className="ml-1" /> : <FaSortAmountDown className="ml-1" />
+                    sortDirection === 'asc' ? 
+                    <ArrowUp className="ml-1 h-4 w-4" /> : 
+                    <ArrowDown className="ml-1 h-4 w-4" />
                   )}
+                  {sortField !== 'name' && <ArrowUpDown className="ml-1 h-4 w-4" />}
                 </div>
               </th>
               <th 
-                className="px-4 py-2 text-left cursor-pointer"
-                onClick={() => handleSortChange('category')}
+                className="px-4 py-3 text-left font-medium text-gray-600 cursor-pointer" 
+                onClick={() => handleSortChange('category_id')}
               >
                 <div className="flex items-center">
-                  <span>Category</span>
-                  {sortField === 'category' && (
-                    sortDirection === 'asc' ? <FaSortAmountUp className="ml-1" /> : <FaSortAmountDown className="ml-1" />
+                  ໝວດໝູ່ 
+                  {sortField === 'category_id' && (
+                    sortDirection === 'asc' ? 
+                    <ArrowUp className="ml-1 h-4 w-4" /> : 
+                    <ArrowDown className="ml-1 h-4 w-4" />
                   )}
+                  {sortField !== 'category_id' && <ArrowUpDown className="ml-1 h-4 w-4" />}
                 </div>
               </th>
               <th 
-                className="px-4 py-2 text-right cursor-pointer"
+                className="px-4 py-3 text-right font-medium text-gray-600 cursor-pointer" 
                 onClick={() => handleSortChange('price')}
               >
                 <div className="flex items-center justify-end">
-                  <span>Price</span>
+                  ລາຄາ 
                   {sortField === 'price' && (
-                    sortDirection === 'asc' ? <FaSortAmountUp className="ml-1" /> : <FaSortAmountDown className="ml-1" />
+                    sortDirection === 'asc' ? 
+                    <ArrowUp className="ml-1 h-4 w-4" /> : 
+                    <ArrowDown className="ml-1 h-4 w-4" />
                   )}
+                  {sortField !== 'price' && <ArrowUpDown className="ml-1 h-4 w-4" />}
                 </div>
               </th>
-              <th 
-                className="px-4 py-2 text-right cursor-pointer"
-                onClick={() => handleSortChange('stock')}
-              >
-                <div className="flex items-center justify-end">
-                  <span>Stock</span>
-                  {sortField === 'stock' && (
-                    sortDirection === 'asc' ? <FaSortAmountUp className="ml-1" /> : <FaSortAmountDown className="ml-1" />
-                  )}
-                </div>
-              </th>
-              <th className="px-4 py-2 text-center">Status</th>
-              <th className="px-4 py-2 text-right">Actions</th>
+              <th className="px-4 py-3 text-center font-medium text-gray-600">ສະຖານະ</th>
+              <th className="px-4 py-3 text-center font-medium text-gray-600">ປະເພດ</th>
+              <th className="px-4 py-3 text-right font-medium text-gray-600">ຈັດການ</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y">
             {isLoadingProducts ? (
-              // Loading state
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center">
-                  <div className="flex items-center justify-center">
-                    <FaSpinner className="w-6 h-6 mr-2 animate-spin text-brown-600" />
-                    <span>Loading products...</span>
-                  </div>
-                </td>
-              </tr>
-            ) : productsData?.products?.length === 0 ? (
-              // Empty state
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center">
-                  <p className="text-gray-500">No products found.</p>
-                  <button
-                    onClick={handleAddProduct}
-                    className="mt-2 px-4 py-2 bg-brown-600 text-white rounded-md hover:bg-brown-700 transition-colors"
-                  >
-                    Add your first product
-                  </button>
-                </td>
-              </tr>
+              <tr><td colSpan={7} className="text-center py-8">
+                <Loader2 className="animate-spin inline-block mr-2 h-5 w-5" /> ກຳລັງໂຫລດ...
+              </td></tr>
+            ) : hasProductsError ? (
+              <tr><td colSpan={7} className="text-center py-8 text-red-500">
+                ເກີດຂໍ້ຜິດພາດ: {foodError?.message || beverageError?.message}
+              </td></tr>
+            ) : products.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-8 text-gray-500">ບໍ່ພົບສິນຄ້າ</td></tr>
             ) : (
-              // Products list
-              productsData?.products?.map((product) => (
-                <tr key={product.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    <div className="w-12 h-12 relative rounded overflow-hidden">
-                      {product.image ? (
-                        <Image
-                          src={product.image}
-                          alt={product.name}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-gray-400 text-xs">No image</span>
-                        </div>
-                      )}
+              products.map((product) => (
+                <tr key={`${product.type}-${product.id}`} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="w-14 h-14 relative rounded-md overflow-hidden border bg-gray-100">
+                      {product.image ? 
+                        <Image 
+                          src={product.image} 
+                          alt={product.name} 
+                          fill 
+                          className="object-cover" 
+                        /> : 
+                        <div className="flex items-center justify-center h-full text-xs text-gray-400">No Image</div>
+                      }
                     </div>
                   </td>
-                  <td className="px-4 py-2">{product.name}</td>
-                  <td className="px-4 py-2">{product.category?.name || '-'}</td>
-                  <td className="px-4 py-2 text-right">{formatCurrency(product.price)}</td>
-                  <td className="px-4 py-2 text-right">{product.stock}</td>
-                  <td className="px-4 py-2 text-center">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        product.active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {product.active ? 'Active' : 'Inactive'}
+                  <td className="px-4 py-3 font-medium">{product.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{getCategoryName(product.category_id)}</td>
+                  <td className="px-4 py-3 text-right font-medium">{formatCurrency(product.price)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {renderStatusBadge(product.status)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.type === 'food' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                      {product.type === 'food' ? 'ອາຫານ' : 'ເຄື່ອງດື່ມ'}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={() => handleViewProduct(product.id)}
-                        className="p-1 text-blue-600 hover:text-blue-800"
-                        title="View Product"
+                      <Button 
+                        onClick={() => handleViewProduct(product)} 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                       >
-                        <FaEye />
-                      </button>
-                      <button
-                        onClick={() => handleEditProduct(product.id)}
-                        className="p-1 text-yellow-600 hover:text-yellow-800"
-                        title="Edit Product"
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        onClick={() => handleEditProduct(product)} 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-amber-600 hover:text-amber-800 hover:bg-amber-50"
                       >
-                        <FaEdit />
-                      </button>
-                      <button
-                        onClick={() => confirmDelete(product)}
-                        className="p-1 text-red-600 hover:text-red-800"
-                        title="Delete Product"
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        onClick={() => confirmDelete(product)} 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-red-600 hover:text-red-800 hover:bg-red-50"
                       >
-                        <FaTrash />
-                      </button>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -348,132 +457,449 @@ const ProductList = () => {
       </div>
 
       {/* Pagination */}
-      {productsData?.totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
-            Showing {(page - 1) * limit + 1} to {Math.min(page * limit, productsData?.totalItems)} of {productsData?.totalItems} products
+            ສະແດງ {(page - 1) * limit + 1} ຫາ {Math.min(page * limit, totalItems)} ຈາກທັງໝົດ {totalItems} ລາຍການ
           </div>
           <div className="flex space-x-1">
-            <button
-              onClick={() => handlePageChange(1)}
-              disabled={page === 1}
-              className={`px-3 py-1 rounded ${
-                page === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+            <Button 
+              onClick={() => handlePageChange(page - 1)} 
+              disabled={page === 1} 
+              variant="outline" 
+              size="sm" 
+              className="px-2"
             >
-              <FaAngleDoubleLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page === 1}
-              className={`px-3 py-1 rounded ${
-                page === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              <FaChevronLeft className="h-4 w-4" />
-            </button>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
             
-            {/* Page numbers */}
-            {Array.from({ length: Math.min(5, productsData?.totalPages) }, (_, i) => {
-              // Logic to handle showing correct page numbers
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              // Show at most 5 page buttons
               let pageNum;
-              if (productsData?.totalPages <= 5) {
-                // If 5 or fewer pages, show all
+              if (totalPages <= 5) {
                 pageNum = i + 1;
-              } else if (page <= 3) {
-                // If near the start
-                pageNum = i + 1;
-              } else if (page >= productsData?.totalPages - 2) {
-                // If near the end
-                pageNum = productsData?.totalPages - 4 + i;
               } else {
-                // Somewhere in the middle
-                pageNum = page - 2 + i;
+                // Center the current page
+                const startPage = Math.max(1, page - 2);
+                const endPage = Math.min(totalPages, startPage + 4);
+                pageNum = startPage + i;
+                if (pageNum > endPage) return null;
               }
               
               return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`px-3 py-1 rounded ${
-                    page === pageNum
-                      ? 'bg-brown-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                <Button 
+                  key={pageNum} 
+                  onClick={() => handlePageChange(pageNum)} 
+                  variant={page === pageNum ? "default" : "outline"}
+                  size="sm"
+                  className={page === pageNum ? "bg-amber-700 hover:bg-amber-800" : ""}
                 >
                   {pageNum}
-                </button>
+                </Button>
               );
             })}
             
-            <button
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page === productsData?.totalPages}
-              className={`px-3 py-1 rounded ${
-                page === productsData?.totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+            <Button 
+              onClick={() => handlePageChange(page + 1)} 
+              disabled={page === totalPages} 
+              variant="outline" 
+              size="sm" 
+              className="px-2"
             >
-              <FaChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => handlePageChange(productsData?.totalPages)}
-              disabled={page === productsData?.totalPages}
-              className={`px-3 py-1 rounded ${
-                page === productsData?.totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              <FaAngleDoubleRight className="h-4 w-4" />
-            </button>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
-            <div className="fixed inset-0 bg-black bg-opacity-30 transition-opacity" onClick={handleCancelDelete}></div>
-            <div className="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all max-w-lg w-full">
-              <div className="px-6 py-4">
-                <h3 className="text-lg font-medium text-gray-900">Delete Product</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Are you sure you want to delete the product "{productToDelete?.name}"? This action cannot be undone.
-                </p>
+      {/* Add Product Dialog */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">ເພີ່ມສິນຄ້າໃໝ່</DialogTitle>
+            <DialogDescription>
+              ກະລຸນາປ້ອນຂໍ້ມູນສິນຄ້າທີ່ທ່ານຕ້ອງການເພີ່ມ
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmitAdd}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="type" className="text-right">ປະເພດສິນຄ້າ</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={(value) => handleSelectChange('type', value)}
+                  className="col-span-3"
+                >
+                  <SelectTrigger id="type">
+                    <SelectValue placeholder="ເລືອກປະເພດສິນຄ້າ">
+                      {formData.type === 'food' ? 'ອາຫານ' : 'ເຄື່ອງດື່ມ'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="food">ອາຫານ</SelectItem>
+                    <SelectItem value="beverage">ເຄື່ອງດື່ມ</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="px-6 py-3 bg-gray-50 text-right">
-                <button
-                  onClick={handleCancelDelete}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brown-500"
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">ຊື່ສິນຄ້າ</Label>
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={formData.name} 
+                  onChange={handleFormChange} 
+                  className="col-span-3" 
+                  required 
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="price" className="text-right">ລາຄາ</Label>
+                <Input 
+                  id="price" 
+                  name="price" 
+                  type="number" 
+                  value={formData.price} 
+                  onChange={handleFormChange} 
+                  className="col-span-3" 
+                  required 
+                />
+              </div>
+              
+              {formData.type === 'beverage' && (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="hot_price" className="text-right">ລາຄາ (ຮ້ອນ)</Label>
+                    <Input 
+                      id="hot_price" 
+                      name="hot_price" 
+                      type="number" 
+                      value={formData.hot_price} 
+                      onChange={handleFormChange} 
+                      className="col-span-3" 
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="ice_price" className="text-right">ລາຄາ (ເຢັນ)</Label>
+                    <Input 
+                      id="ice_price" 
+                      name="ice_price" 
+                      type="number" 
+                      value={formData.ice_price} 
+                      onChange={handleFormChange} 
+                      className="col-span-3" 
+                    />
+                  </div>
+                </>
+              )}
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">ໝວດໝູ່</Label>
+                <Select 
+                  value={formData.category_id} 
+                  onValueChange={(value) => handleSelectChange('category_id', value)}
+                  className="col-span-3"
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteConfirmed}
-                  disabled={isDeleting}
-                  className="ml-2 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="ເລືອກໝວດໝູ່">
+                      {formData.category_id ? getCategoryName(formData.category_id) : 'ເລືອກໝວດໝູ່'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">ເລືອກໝວດໝູ່</SelectItem>
+                    {categoryOptions.map(category => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">ສະຖານະ</Label>
+                <Select 
+                  value={formData.status} 
+                  onValueChange={(value) => handleSelectChange('status', value)}
+                  className="col-span-3"
                 >
-                  {isDeleting ? (
-                    <div className="flex items-center">
-                      <FaSpinner className="animate-spin mr-2" />
-                      Deleting...
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="ເລືອກສະຖານະ">
+                      {formData.status === 'active' ? 'ເປີດໃຊ້ງານ' : 'ປິດໃຊ້ງານ'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">ເປີດໃຊ້ງານ</SelectItem>
+                    <SelectItem value="inactive">ປິດໃຊ້ງານ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="description" className="text-right pt-2">ຄຳອະທິບາຍ</Label>
+                <Textarea 
+                  id="description" 
+                  name="description" 
+                  value={formData.description} 
+                  onChange={handleFormChange} 
+                  className="col-span-3 min-h-[80px]" 
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="image" className="text-right pt-2">ຮູບພາບ</Label>
+                <div className="col-span-3">
+                  <ImageUpload 
+                    value={formData.image} 
+                    onChange={handleImageChange} 
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowAddModal(false)}
+              >
+                ຍົກເລີກ
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-amber-700 hover:bg-amber-800"
+              >
+                ເພີ່ມສິນຄ້າ
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">ແກ້ໄຂສິນຄ້າ</DialogTitle>
+            <DialogDescription>
+              ທ່ານກຳລັງແກ້ໄຂສິນຄ້າ "{productToEdit?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmitEdit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-type" className="text-right">ປະເພດສິນຄ້າ</Label>
+                <Input 
+                  id="edit-type" 
+                  value={formData.type === 'food' ? 'ອາຫານ' : 'ເຄື່ອງດື່ມ'} 
+                  className="col-span-3" 
+                  disabled 
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-name" className="text-right">ຊື່ສິນຄ້າ</Label>
+                <Input 
+                  id="edit-name" 
+                  name="name" 
+                  value={formData.name} 
+                  onChange={handleFormChange} 
+                  className="col-span-3" 
+                  required 
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-price" className="text-right">ລາຄາ</Label>
+                <Input 
+                  id="edit-price" 
+                  name="price" 
+                  type="number" 
+                  value={formData.price} 
+                  onChange={handleFormChange} 
+                  className="col-span-3" 
+                  required 
+                />
+              </div>
+              
+              {formData.type === 'beverage' && (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-hot-price" className="text-right">ລາຄາ (ຮ້ອນ)</Label>
+                    <Input 
+                      id="edit-hot-price" 
+                      name="hot_price" 
+                      type="number" 
+                      value={formData.hot_price} 
+                      onChange={handleFormChange} 
+                      className="col-span-3" 
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-ice-price" className="text-right">ລາຄາ (ເຢັນ)</Label>
+                    <Input 
+                      id="edit-ice-price" 
+                      name="ice_price" 
+                      type="number" 
+                      value={formData.ice_price} 
+                      onChange={handleFormChange} 
+                      className="col-span-3" 
+                    />
+                  </div>
+                </>
+              )}
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-category" className="text-right">ໝວດໝູ່</Label>
+                <Select 
+                  value={formData.category_id} 
+                  onValueChange={(value) => handleSelectChange('category_id', value)}
+                  className="col-span-3"
+                >
+                  <SelectTrigger id="edit-category">
+                    <SelectValue placeholder="ເລືອກໝວດໝູ່">
+                      {formData.category_id ? getCategoryName(formData.category_id) : 'ເລືອກໝວດໝູ່'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">ເລືອກໝວດໝູ່</SelectItem>
+                    {categoryOptions.map(category => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-status" className="text-right">ສະຖານະ</Label>
+                <Select 
+                  value={formData.status} 
+                  onValueChange={(value) => handleSelectChange('status', value)}
+                  className="col-span-3"
+                >
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="ເລືອກສະຖານະ">
+                      {formData.status === 'active' ? 'ເປີດໃຊ້ງານ' : 'ປິດໃຊ້ງານ'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">ເປີດໃຊ້ງານ</SelectItem>
+                    <SelectItem value="inactive">ປິດໃຊ້ງານ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-description" className="text-right pt-2">ຄຳອະທິບາຍ</Label>
+                <Textarea 
+                  id="edit-description" 
+                  name="description" 
+                  value={formData.description} 
+                  onChange={handleFormChange} 
+                  className="col-span-3 min-h-[80px]" 
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-image" className="text-right pt-2">ຮູບພາບ</Label>
+                <div className="col-span-3">
+                  <ImageUpload 
+                    value={formData.image} 
+                    onChange={handleImageChange} 
+                  />
+                  {formData.image && typeof formData.image === 'string' && (
+                    <div className="mt-2 w-full">
+                      <p className="text-xs text-gray-500 mb-1">ຮູບພາບປັດຈຸບັນ:</p>
+                      <div className="w-32 h-32 relative rounded-md overflow-hidden border">
+                        <img src={formData.image} alt="Preview" className="object-cover w-full h-full" />
+                      </div>
                     </div>
-                  ) : (
-                    'Delete'
                   )}
-                </button>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowEditModal(false)}
+              >
+                ຍົກເລີກ
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-amber-700 hover:bg-amber-800"
+              >
+                ບັນທຶກການແກ້ໄຂ
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Product Dialog */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">ຢືນຢັນການລຶບສິນຄ້າ</DialogTitle>
+            <DialogDescription>
+              ການກະທຳນີ້ບໍ່ສາມາດຍ້ອນກັບໄດ້
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="mb-2">ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການລຶບສິນຄ້ານີ້?</p>
+            <div className="flex items-center p-3 bg-gray-50 rounded-md">
+              {productToDelete?.image && (
+                <div className="w-12 h-12 relative mr-3 rounded-md overflow-hidden border">
+                  <Image 
+                    src={productToDelete.image} 
+                    alt={productToDelete.name} 
+                    fill 
+                    className="object-cover" 
+                  />
+                </div>
+              )}
+              <div>
+                <p className="font-medium">{productToDelete?.name}</p>
+                <p className="text-sm text-gray-500">
+                  {productToDelete?.type === 'food' ? 'ອາຫານ' : 'ເຄື່ອງດື່ມ'} • {formatCurrency(productToDelete?.price)}
+                </p>
               </div>
             </div>
           </div>
-        </div>
-      )}
+          
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setShowDeleteModal(false)}
+            >
+              ຍົກເລີກ
+            </Button>
+            <Button 
+              type="button" 
+              variant="destructive" 
+              onClick={handleDeleteConfirmed}
+              disabled={isDeletingFood || isDeletingBeverage}
+            >
+              {isDeletingFood || isDeletingBeverage ? (
+                <>
+                  <Loader2 className="animate-spin mr-2 h-4 w-4" /> ກຳລັງລຶບ...
+                </>
+              ) : 'ລຶບສິນຄ້າ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
