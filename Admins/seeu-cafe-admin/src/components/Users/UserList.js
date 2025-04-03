@@ -1,16 +1,17 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FaUserEdit, FaTrash, FaSearch, FaUserPlus, FaFilter, FaSpinner } from 'react-icons/fa';
-import { useUsers, useDeleteUser, getUserRoleColor, getUserStatusColor } from '@/hooks/userHooks';
+import { useUsers, useDeleteUser, getUserRoleColor, getUserStatusColor, getUserSingleRole } from '@/hooks/userHooks';
 import { EditUserModal, DeleteUserModal } from './Modals';
 import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 
 const UserList = () => {
-  // State for filters and pagination
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [role, setRole] = useState('');
   const [page, setPage] = useState(1);
@@ -18,8 +19,10 @@ const UserList = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  
+  const queryClient = useQueryClient();
 
-  // Build filter object for API
+  
   const filters = {
     search: searchTerm,
     role,
@@ -29,7 +32,7 @@ const UserList = () => {
     sortDir: 'desc'
   };
 
-  // Fetch users with filters
+  
   const { 
     data: usersData, 
     isLoading: isLoadingUsers,
@@ -37,68 +40,76 @@ const UserList = () => {
     error: usersError
   } = useUsers(filters);
 
-  // Delete user mutation
+  
   const { mutate: deleteUser, isLoading: isDeleting } = useDeleteUser();
 
-  // Handle search input changes with debounce
+  
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setPage(1); // Reset to first page on new search
+    setPage(1); 
   };
 
-  // Handle role filter changes
+  
   const handleRoleChange = (e) => {
     setRole(e.target.value);
-    setPage(1); // Reset to first page on new filter
+    setPage(1); 
   };
 
-  // Handle edit user
+  
   const handleEdit = (user) => {
     setSelectedUser(user);
     setEditModalOpen(true);
   };
 
-  // Handle delete user
+  
   const handleDelete = (user) => {
     setSelectedUser(user);
     setDeleteModalOpen(true);
   };
 
-  // Handle save edit
-  const handleSaveEdit = async (updatedUser) => {
-    try {
-      // API handling is done within the modal using our hooks
-      setEditModalOpen(false);
-      queryClient.invalidateQueries(['users']);
-    } catch (error) {
-      console.error('Update error:', error);
-    }
+  
+  const handleSaveEdit = (updatedUser) => {
+    // The EditUserModal already invalidates the queries and shows toast message
+    // Just update local state
+    setEditModalOpen(false);
+    setSelectedUser(null);
   };
 
-  // Handle confirm delete
+  
   const handleConfirmDelete = () => {
     if (selectedUser) {
-      deleteUser(selectedUser.id, {
-        onSuccess: () => {
-          setDeleteModalOpen(false);
-          setSelectedUser(null);
-        }
-      });
+      try {
+        deleteUser(selectedUser.id, {
+          onSuccess: () => {
+            setDeleteModalOpen(false);
+            setSelectedUser(null);
+            // Toast is shown by the useDeleteUser mutation
+          },
+          onError: (error) => {
+            console.error('Error deleting user:', error);
+            const errorMessage = error.response?.data?.message || 'ເກີດຂໍ້ຜິດພາດໃນການລຶບຜູ້ໃຊ້';
+            toast.error(errorMessage);
+          }
+        });
+      } catch (error) {
+        console.error('Error in delete handler:', error);
+        toast.error('ເກີດຂໍ້ຜິດພາດໃນການລຶບຜູ້ໃຊ້');
+      }
     }
   };
 
-  // Handle page change
+  
   const handlePageChange = (newPage) => {
     setPage(newPage);
   };
 
-  // Handle limit change
+  
   const handleLimitChange = (e) => {
     setLimit(Number(e.target.value));
-    setPage(1); // Reset to first page on limit change
+    setPage(1); 
   };
 
-  // Format user name based on first_name and last_name
+  
   const formatUserName = (user) => {
     if (user.first_name && user.last_name) {
       return `${user.first_name} ${user.last_name}`;
@@ -111,63 +122,13 @@ const UserList = () => {
     }
   };
 
-  // ฟังก์ชันที่ปรับปรุงเพื่อดึงตำแหน่งล่าสุดของผู้ใช้
-const getUserRole = (user) => {
-  // กรณีที่มี roles เป็น array
-  if (Array.isArray(user.roles) && user.roles.length > 0) {
-    // สร้างสำเนาเพื่อไม่ให้กระทบข้อมูลต้นฉบับ
-    const sortedRoles = [...user.roles];
-    
-    // เรียงลำดับตาม assigned_at จากใหม่ไปเก่า (ล่าสุดอยู่แรก)
-    sortedRoles.sort((a, b) => {
-      const dateA = a.assigned_at || a.created_at || a.updatedAt || 0;
-      const dateB = b.assigned_at || b.created_at || b.updatedAt || 0;
-      return new Date(dateB) - new Date(dateA);
-    });
-    
-    // ดึงตำแหน่งล่าสุด (ตัวแรกหลังจากเรียงลำดับแล้ว)
-    const latestRole = sortedRoles[0];
-    
-    // ตรวจสอบว่าตำแหน่งเป็น object หรือไม่
-    if (typeof latestRole === 'object' && latestRole !== null) {
-      // ถ้ามี role property ใน object (กรณี join กับตาราง roles)
-      if (latestRole.role) {
-        return latestRole.role.name || latestRole.role;
-      }
-      // ถ้ามี name property
-      if (latestRole.name) {
-        return latestRole.name;
-      }
-      // ถ้ามีแค่ role_id
-      if (latestRole.role_id) {
-        return latestRole.role_id.toString();
-      }
-      // กรณีอื่นๆ ลองใช้ค่าใน object โดยตรง
-      return latestRole.toString();
-    }
-    
-    // ถ้า latestRole ไม่ใช่ object (เป็น string หรือค่าอื่นๆ)
-    return latestRole;
-  } 
   
-  // กรณีมี roles เป็น object (จาก API บางรูปแบบ)
-  else if (user.roles && typeof user.roles === 'object' && !Array.isArray(user.roles)) {
-    return user.roles.name || Object.values(user.roles)[0] || 'user';
-  }
-  
-  // กรณีมี role โดยตรง (รูปแบบเก่า)
-  else if (user.role) {
-    if (typeof user.role === 'object') {
-      return user.role.name || user.role.id;
-    }
-    return user.role;
-  }
-  
-  // ไม่พบข้อมูลตำแหน่ง
-  return 'user'; // ค่าเริ่มต้น
-};
+  const getUserRole = (user) => {
+    const roleObj = getUserSingleRole(user);
+    return roleObj.name || roleObj.id;
+  };
 
-  // Format date for display
+  
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     
@@ -193,10 +154,7 @@ const getUserRole = (user) => {
     );
   }
 
-  // For debugging purposes
-  console.log('Users data:', usersData);
-
-  // Extract users from the response according to the API structure
+  
   const users = usersData?.users || usersData?.data || usersData || [];
   const totalItems = usersData?.totalItems || usersData?.meta?.total || users.length || 0;
   const totalPages = usersData?.totalPages || usersData?.meta?.lastPage || Math.ceil(totalItems / limit) || 1;
@@ -213,9 +171,9 @@ const getUserRole = (user) => {
         </Link>
       </div>
       
-      {/* Search and Filters */}
+      {}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Search */}
+        {}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <FaSearch className="text-gray-400" />
@@ -229,7 +187,7 @@ const getUserRole = (user) => {
           />
         </div>
 
-        {/* Role Filter */}
+        {}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <FaFilter className="text-gray-400" />
@@ -247,7 +205,7 @@ const getUserRole = (user) => {
           </select>
         </div>
 
-        {/* Items per page */}
+        {}
         <div className="flex items-center">
           <span className="text-gray-600 mr-2">ສະແດງ:</span>
           <select
@@ -264,7 +222,7 @@ const getUserRole = (user) => {
         </div>
       </div>
 
-      {/* Users Table */}
+      {}
       <div className="overflow-x-auto mb-6">
         <table className="w-full border-collapse">
           <thead>
@@ -279,7 +237,7 @@ const getUserRole = (user) => {
           </thead>
           <tbody>
             {isLoadingUsers ? (
-              // Loading state
+              
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center">
                   <div className="flex items-center justify-center">
@@ -289,7 +247,7 @@ const getUserRole = (user) => {
                 </td>
               </tr>
             ) : users?.length === 0 ? (
-              // Empty state
+              
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center">
                   <p className="text-gray-500">ບໍ່ພົບຂໍ້ມູນຜູ້ໃຊ້</p>
@@ -299,7 +257,7 @@ const getUserRole = (user) => {
                 </td>
               </tr>
             ) : (
-              // Users list
+              
               users?.map((user) => (
                 <tr key={user.id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap">
@@ -350,7 +308,7 @@ const getUserRole = (user) => {
         </table>
       </div>
 
-      {/* Pagination */}
+      {}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
@@ -374,7 +332,7 @@ const getUserRole = (user) => {
               ‹
             </Button>
             
-            {/* Page numbers */}
+            {}
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
               if (totalPages <= 5) {
@@ -419,7 +377,7 @@ const getUserRole = (user) => {
         </div>
       )}
 
-      {/* Modals */}
+      {}
       <EditUserModal 
         user={selectedUser}
         isOpen={editModalOpen}

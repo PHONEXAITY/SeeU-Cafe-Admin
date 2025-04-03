@@ -5,49 +5,66 @@ import { analyticsService } from '@/services/api';
 
 // Get sales analytics data
 export const useSalesAnalytics = (timeRange = '7d', filters = {}) => {
-  return useQuery(
-    ['salesAnalytics', timeRange, filters],
-    () => analyticsService.getSalesAnalytics(timeRange, filters).then(res => res.data),
-    {
-      keepPreviousData: true,
-      staleTime: 1000 * 60 * 15, // 15 minutes
-    }
-  );
+  return useQuery({
+    queryKey: ['salesAnalytics', timeRange, filters],
+    queryFn: async () => {
+      const { data } = await analyticsService.getSalesAnalytics(timeRange, filters);
+      return data || { salesData: [], summary: {} };
+    },
+    keepPreviousData: true,
+    staleTime: 1000 * 60 * 15, // 15 minutes
+  });
 };
 
 // Get product analytics data
 export const useProductAnalytics = (filters = {}) => {
-  return useQuery(
-    ['productAnalytics', filters],
-    () => analyticsService.getProductAnalytics(filters).then(res => res.data),
-    {
-      keepPreviousData: true,
-      staleTime: 1000 * 60 * 15, // 15 minutes
-    }
-  );
+  return useQuery({
+    queryKey: ['productAnalytics', filters],
+    queryFn: async () => {
+      const { data } = await analyticsService.getProductAnalytics(filters);
+      return data || { products: [], categories: [] };
+    },
+    keepPreviousData: true,
+    staleTime: 1000 * 60 * 15, // 15 minutes
+  });
 };
 
 // Get user analytics data
 export const useUserAnalytics = (filters = {}) => {
-  return useQuery(
-    ['userAnalytics', filters],
-    () => analyticsService.getUserAnalytics(filters).then(res => res.data),
-    {
-      keepPreviousData: true,
-      staleTime: 1000 * 60 * 15, // 15 minutes
-    }
-  );
+  return useQuery({
+    queryKey: ['userAnalytics', filters],
+    queryFn: async () => {
+      const { data } = await analyticsService.getUserAnalytics(filters);
+      return data || { users: [], metrics: {} };
+    },
+    keepPreviousData: true,
+    staleTime: 1000 * 60 * 15, // 15 minutes
+  });
 };
 
 // Get dashboard stats
 export const useDashboardStats = () => {
-  return useQuery(
-    'dashboardStats',
-    () => analyticsService.getDashboardStats().then(res => res.data),
-    {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-    }
-  );
+  return useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: async () => {
+      const { data } = await analyticsService.getDashboardStats();
+      return data || { 
+        totalOrders: 0, 
+        totalRevenue: 0, 
+        totalCustomers: 0, 
+        totalProducts: 0,
+        orderChange: 0,
+        revenueChange: 0,
+        customerChange: 0,
+        productChange: 0,
+        recentOrders: [],
+        topProducts: [],
+        lowStockProducts: [], 
+        recentReviews: []
+      };
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 };
 
 // Time range options for analytics

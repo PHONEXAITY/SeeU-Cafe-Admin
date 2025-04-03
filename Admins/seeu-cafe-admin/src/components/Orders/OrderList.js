@@ -1,13 +1,14 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { Coffee, Search, Filter, Eye, Edit, Trash2, Clock, Package, Check, X } from 'lucide-react';
+import { Coffee, Search, Filter, Eye, Edit, Trash2, Clock, Package, Check, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
-import { toast } from '@/components/ui/toast';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { toast } from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/card';
+import { useOrders, useDeleteOrder, orderStatusOptions, formatCurrency } from '@/hooks/orderHooks';
 
 // ค่าคงที่
 const orderStatuses = ['All', 'Pending', 'Processing', 'Ready', 'Delivered', 'Cancelled'];

@@ -1,49 +1,56 @@
-'use client'
+"use client";
 
-import React, { useEffect, memo, lazy, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
-import { motion, AnimatePresence } from 'framer-motion';
-import { selectIsAuthenticated, selectAuthLoading, selectAuthInitialized } from '@/store/slices/authSlice';
+import React, { useEffect, memo, lazy, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  selectIsAuthenticated,
+  selectAuthLoading,
+  selectAuthInitialized,
+} from "@/store/slices/authSlice";
 
-// Layout component import
-import Layout from '@/components/layout/Layout';
+import Layout from "@/components/layout/Layout";
 
-// Lazy load dashboard components for better performance
-const DashboardStats = lazy(() => import('@/components/dashboard/DashboardStats'));
-const SalesAnalytics = lazy(() => import('@/components/dashboard/SalesAnalytics'));
-const TrendingCoffee = lazy(() => import('@/components/dashboard/TrendingCoffee'));
-const RecentOrders = lazy(() => import('@/components/dashboard/RecentOrders'));
-const CustomerMap = lazy(() => import('@/components/dashboard/CustomerMap'));
-const RevenueChart = lazy(() => import('@/components/dashboard/RevenueChart'));
+const DashboardStats = lazy(() =>
+  import("@/components/dashboard/DashboardStats")
+);
+const SalesAnalytics = lazy(() =>
+  import("@/components/dashboard/SalesAnalytics")
+);
+const TrendingCoffee = lazy(() =>
+  import("@/components/dashboard/TrendingCoffee")
+);
+const RecentOrders = lazy(() => import("@/components/dashboard/RecentOrders"));
+const CustomerMap = lazy(() => import("@/components/dashboard/CustomerMap"));
+const RevenueChart = lazy(() => import("@/components/dashboard/RevenueChart"));
 
-// Loading component with Framer Motion
 const LoadingIndicator = ({ message }) => {
   const containerVariants = {
     initial: { opacity: 0 },
-    animate: { opacity: 1, transition: { duration: 0.5 } }
+    animate: { opacity: 1, transition: { duration: 0.5 } },
   };
 
   const circleVariants = {
     initial: { scale: 0.8, opacity: 0.3 },
-    animate: { scale: 1, opacity: 1 }
+    animate: { scale: 1, opacity: 1 },
   };
 
   const circleTransition = {
     duration: 0.8,
     repeat: Infinity,
     repeatType: "reverse",
-    ease: "easeInOut"
+    ease: "easeInOut",
   };
 
   return (
-    <motion.div 
+    <motion.div
       className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-50 to-white"
       variants={containerVariants}
       initial="initial"
       animate="animate"
     >
-      <motion.div 
+      <motion.div
         className="p-8 rounded-xl bg-white shadow-xl flex flex-col items-center"
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -59,12 +66,12 @@ const LoadingIndicator = ({ message }) => {
               animate="animate"
               transition={{
                 ...circleTransition,
-                delay: index * 0.2
+                delay: index * 0.2,
               }}
             />
           ))}
         </div>
-        
+
         <motion.div
           initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -78,18 +85,18 @@ const LoadingIndicator = ({ message }) => {
   );
 };
 
-// Component loader with fallback
 const ComponentLoader = ({ children }) => (
-  <Suspense fallback={
-    <div className="p-4 rounded-lg bg-gray-50 animate-pulse flex items-center justify-center h-64">
-      <p className="text-gray-400">กำลังโหลด...</p>
-    </div>
-  }>
+  <Suspense
+    fallback={
+      <div className="p-4 rounded-lg bg-gray-50 animate-pulse flex items-center justify-center h-64">
+        <p className="text-gray-400">กำลังโหลด...</p>
+      </div>
+    }
+  >
     {children}
   </Suspense>
 );
 
-// Main Dashboard section - memoized for performance
 const DashboardContent = memo(() => {
   return (
     <AnimatePresence>
@@ -101,9 +108,9 @@ const DashboardContent = memo(() => {
         <ComponentLoader>
           <DashboardStats />
         </ComponentLoader>
-        
+
         <div className="grid gap-8 mb-8 md:grid-cols-2 xl:grid-cols-4 mt-8">
-          <motion.div 
+          <motion.div
             className="md:col-span-2 xl:col-span-3"
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -113,8 +120,8 @@ const DashboardContent = memo(() => {
               <SalesAnalytics />
             </ComponentLoader>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             className="md:col-span-2 xl:col-span-1"
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -125,10 +132,10 @@ const DashboardContent = memo(() => {
             </ComponentLoader>
           </motion.div>
         </div>
-        
+
         <div className="container mx-auto p-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <motion.div 
+            <motion.div
               className="bg-white shadow-md rounded-lg p-6"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -139,8 +146,8 @@ const DashboardContent = memo(() => {
                 <RevenueChart />
               </ComponentLoader>
             </motion.div>
-            
-            <motion.div 
+
+            <motion.div
               className="bg-white shadow-md rounded-lg p-6"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -153,8 +160,8 @@ const DashboardContent = memo(() => {
             </motion.div>
           </div>
         </div>
-        
-        <motion.div 
+
+        <motion.div
           className="mt-8"
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -169,44 +176,39 @@ const DashboardContent = memo(() => {
   );
 });
 
-DashboardContent.displayName = 'DashboardContent';
+DashboardContent.displayName = "DashboardContent";
 
-// Main Dashboard Page Component
 const DashboardPage = () => {
   const router = useRouter();
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const authLoading = useSelector(selectAuthLoading);
   const isInitialized = useSelector(selectAuthInitialized);
-  
-  // Authentication check effect
+
   useEffect(() => {
-    // Only proceed if auth is initialized and not loading
     if (!isInitialized || authLoading) return;
-    
-    // Redirect if not authenticated
+
     if (!isAuthenticated) {
       console.log("User not authenticated, redirecting to login...");
-      router.push('/login');
+      router.push("/login");
     }
   }, [isAuthenticated, authLoading, isInitialized, router]);
-  
-  // Render loading states
+
   if (!isInitialized || authLoading) {
     return (
-      <LoadingIndicator 
-        message={authLoading ? "กำลังตรวจสอบการเข้าสู่ระบบ..." : "กำลังโหลดข้อมูล..."}
+      <LoadingIndicator
+        message={
+          authLoading ? "กำลังตรวจสอบการเข้าสู่ระบบ..." : "กำลังโหลดข้อมูล..."
+        }
       />
     );
   }
-  
-  // Render redirect state
+
   if (!isAuthenticated) {
     return (
       <LoadingIndicator message="กำลังเปลี่ยนเส้นทางไปยังหน้าเข้าสู่ระบบ..." />
     );
   }
-  
-  // Render main dashboard
+
   return (
     <Layout>
       <DashboardContent />

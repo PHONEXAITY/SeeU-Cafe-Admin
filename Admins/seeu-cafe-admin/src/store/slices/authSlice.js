@@ -1,79 +1,129 @@
-'use client';
+"use client";
 
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { authService } from '@/services/api';
-import Cookies from 'js-cookie';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { authService } from "@/services/api";
+import Cookies from "js-cookie";
 
-// Async actions
 export const loginUser = createAsyncThunk(
-  'auth/login',
+  "auth/login",
   async (credentials, { rejectWithValue }) => {
     try {
-      console.log('Login attempt with credentials:', JSON.stringify(credentials));
+      console.log(
+        "Login thunk: Attempting login with credentials:",
+        JSON.stringify({
+          email: credentials.email,
+          password: "******", 
+        })
+      );
+
       const response = await authService.login(credentials);
-      if (response.data.access_token && typeof window !== 'undefined') {
-        Cookies.set('auth_token', response.data.access_token, { expires: 7 }); // Store token in cookie for 7 days
+
+      console.log("Login thunk: Login successful, response:", response.data);
+
+      if (response.data.access_token && typeof window !== "undefined") {
+        Cookies.set("auth_token", response.data.access_token, { expires: 7 });
       }
+
       return response.data;
     } catch (error) {
-      console.error('Login failed:', error);
-      console.error('Error details:', error.message);
+      console.error("Login thunk: Login failed:", error);
 
-      // Handle form errors on client-side
-      if (typeof window !== 'undefined' && window.loginFormErrorsCallback) {
-        window.loginFormErrorsCallback({
-          email: '',
-          password: error.message || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง',
-        });
+      
+      let errorMessage = "Login failed";
+      let errorDetails = {};
+
+      if (error.response) {
+        console.error("Error response status:", error.response.status);
+        console.error("Error response data:", error.response.data);
+
+        
+        switch (error.response.status) {
+          case 400:
+            errorMessage = "Invalid request format";
+            errorDetails = error.response.data;
+            break;
+          case 401:
+            errorMessage = "Invalid credentials";
+            break;
+          case 404:
+            errorMessage = "API endpoint not found";
+            break;
+          case 500:
+            errorMessage = "Server error";
+            break;
+          default:
+            errorMessage = error.response.data?.message || "Login failed";
+        }
       }
 
-      return rejectWithValue(error.message || 'Login failed');
+      
+      if (typeof window !== "undefined" && window.loginFormErrorsCallback) {
+        if (error.response?.status === 400 || error.response?.status === 401) {
+          window.loginFormErrorsCallback({
+            email: errorMessage.includes("email") ? errorMessage : "",
+            password: errorMessage.includes("password")
+              ? errorMessage
+              : "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+          });
+        } else {
+          window.loginFormErrorsCallback({
+            email: "",
+            password: errorMessage || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง",
+          });
+        }
+      }
+
+      return rejectWithValue({
+        message: errorMessage,
+        details: errorDetails,
+      });
     }
   }
 );
 
 export const logoutUser = createAsyncThunk(
-  'auth/logout',
+  "auth/logout",
   async (_, { rejectWithValue }) => {
     try {
       await authService.logout();
-      if (typeof window !== 'undefined') {
-        Cookies.remove('auth_token'); // Remove token on logout
+      if (typeof window !== "undefined") {
+        Cookies.remove("auth_token"); 
       }
       return true;
     } catch (error) {
-      console.error('Logout failed:', error);
-      if (typeof window !== 'undefined') {
-        Cookies.remove('auth_token'); // Remove token even if logout fails
+      console.error("Logout failed:", error);
+      if (typeof window !== "undefined") {
+        Cookies.remove("auth_token"); 
       }
-      return rejectWithValue(error.message || 'Logout failed');
+      return rejectWithValue(error.message || "Logout failed");
     }
   }
 );
 
 export const fetchUserProfile = createAsyncThunk(
-  'auth/fetchUserProfile',
+  "auth/fetchUserProfile",
   async (_, { rejectWithValue }) => {
     try {
       const response = await authService.getProfile();
       return response.data;
     } catch (error) {
-      console.error('Fetch user profile failed:', error);
+      console.error("Fetch user profile failed:", error);
       if (error.response && error.response.status === 401) {
-        if (typeof window !== 'undefined') {
-          Cookies.remove('auth_token'); // Clear token on 401
+        if (typeof window !== "undefined") {
+          Cookies.remove("auth_token"); 
         }
-        return rejectWithValue('unauthorized');
+        return rejectWithValue("unauthorized");
       }
-      return rejectWithValue(error.message || 'Fetch profile failed');
+      return rejectWithValue(error.message || "Fetch profile failed");
     }
   }
 );
 
-// Initial state
+
 const initialState = {
   user: null,
-  token: typeof window !== 'undefined' ? Cookies.get('auth_token') || null : null,
+  token:
+    typeof window !== "undefined" ? Cookies.get("auth_token") || null : null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
@@ -82,7 +132,7 @@ const initialState = {
 };
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState,
   reducers: {
     setRedirectPath: (state, action) => {
@@ -104,7 +154,7 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Login
+      
       .addCase(loginUser.pending, (state) => {
         state.isLoading = true;
         state.error = null;
@@ -123,7 +173,7 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
       })
-      // Logout
+      
       .addCase(logoutUser.pending, (state) => {
         state.isLoading = true;
       })
@@ -139,9 +189,9 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
         state.token = null;
-        state.error = null; // Clear error on logout, even if it fails
+        state.error = null; 
       })
-      // Fetch User Profile
+      
       .addCase(fetchUserProfile.pending, (state) => {
         if (!state.isInitialized) {
           state.isLoading = true;
@@ -156,7 +206,7 @@ const authSlice = createSlice({
       .addCase(fetchUserProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.isInitialized = true;
-        if (action.payload === 'unauthorized') {
+        if (action.payload === "unauthorized") {
           state.isAuthenticated = false;
           state.user = null;
           state.token = null;
@@ -166,12 +216,19 @@ const authSlice = createSlice({
   },
 });
 
-// Export actions
-export const logout = logoutUser; // Alias for logoutUser
-export const { setRedirectPath, clearRedirect, startLoading, stopLoading, setInitialized, reset } = authSlice.actions;
 
-// Export selectors (renamed selectCurrentUser to selectUser for consistency with your components)
-export const selectUser = (state) => state.auth.user; // Changed from selectCurrentUser
+export const logout = logoutUser; 
+export const {
+  setRedirectPath,
+  clearRedirect,
+  startLoading,
+  stopLoading,
+  setInitialized,
+  reset,
+} = authSlice.actions;
+
+
+export const selectUser = (state) => state.auth.user; 
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
 export const selectAuthLoading = (state) => state.auth.isLoading;
 export const selectAuthError = (state) => state.auth.error;

@@ -4,41 +4,87 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
-// Hook to get all users with filters
+
 export const useUsers = (filters = {}) => {
   return useQuery({
     queryKey: ['users', filters],
-    queryFn: () => userService.getAllUsers(filters).then(res => res.data),
+    queryFn: async () => {
+      try {
+        const { data } = await userService.getAllUsers(filters);
+        
+        // Log the response structure for debugging
+        console.log('User data structure:', data);
+        
+        // Handle different response formats
+        if (data && Array.isArray(data)) {
+          // Handle array response format
+          return { 
+            users: data, 
+            totalItems: data.length, 
+            totalPages: 1 
+          };
+        } else if (data && data.data && Array.isArray(data.data)) {
+          // Handle paginated response format with data property
+          return { 
+            users: data.data, 
+            totalItems: data.meta?.total || data.data.length,
+            totalPages: data.meta?.lastPage || Math.ceil((data.meta?.total || data.data.length) / (filters.limit || 10))
+          };
+        } else if (data && data.users && Array.isArray(data.users)) {
+          // Already in the expected format
+          return data;
+        } else {
+          // Unknown format, return empty results
+          console.warn('Unknown user data format:', data);
+          return { users: [], totalItems: 0, totalPages: 0 };
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
+    },
     keepPreviousData: true,
-    staleTime: 10000, // ลดเวลาให้สั้นลง (10 วินาที) เพื่อให้ข้อมูลรีเฟรชเร็วขึ้น
-    refetchOnWindowFocus: true, // รีเฟรชเมื่อกลับมาที่หน้าต่าง
+    staleTime: 60000, // 1 minute
+    refetchOnWindowFocus: true,
   });
 };
 
-// Hook to get a single user by ID
+
 export const useUser = (id) => {
   return useQuery({
     queryKey: ['user', id],
-    queryFn: () => userService.getUserById(id).then(res => res.data),
-    enabled: !!id, // Only run if ID exists
+    queryFn: async () => {
+      if (!id) return null;
+      try {
+        const { data } = await userService.getUserById(id);
+        // Log the response structure for debugging
+        console.log('Single user data structure:', data);
+        return data;
+      } catch (error) {
+        console.error(`Error fetching user with ID ${id}:`, error);
+        throw error;
+      }
+    },
+    enabled: !!id, 
+    staleTime: 60000, // 1 minute
   });
 };
 
-// Hook to create a new user
+
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: (userData) => userService.createUser(userData),
     onSuccess: () => {
-      // Invalidate and refetch users list
+      
       queryClient.invalidateQueries(['users']);
       toast.success('User created successfully');
     },
     onError: (error) => {
       console.error('Failed to create user:', error);
       
-      // Log detailed error information for debugging
+      
       if (error.response) {
         console.error('Error response:', error.response.data);
         console.error('Error status:', error.response.status);
@@ -49,7 +95,7 @@ export const useCreateUser = () => {
   });
 };
 
-// Hook to update an existing user
+
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
   
@@ -59,7 +105,7 @@ export const useUpdateUser = () => {
       return userService.updateUser(id, userData);
     },
     onSuccess: (_, variables) => {
-      // รีเฟรชข้อมูลทั้งหมดที่เกี่ยวข้องทันที
+      
       queryClient.invalidateQueries(['users']);
       queryClient.invalidateQueries(['user', variables.id]);
       toast.success('User updated successfully');
@@ -67,7 +113,7 @@ export const useUpdateUser = () => {
     onError: (error) => {
       console.error('Failed to update user:', error);
       
-      // Log detailed error information for debugging
+      
       if (error.response) {
         console.error('Error response:', error.response.data);
         console.error('Error status:', error.response.status);
@@ -88,7 +134,7 @@ export const useUpdateUser = () => {
   });
 };
 
-// Hook to update user role
+
 export const useChangeUserRole = () => {
   const queryClient = useQueryClient();
   
@@ -106,14 +152,14 @@ export const useChangeUserRole = () => {
   });
 };
 
-// Hook to delete a user
+
 export const useDeleteUser = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: (id) => userService.deleteUser(id),
     onSuccess: () => {
-      // Invalidate and refetch users list
+      
       queryClient.invalidateQueries(['users']);
       toast.success('User deleted successfully');
     },
@@ -124,17 +170,96 @@ export const useDeleteUser = () => {
   });
 };
 
-// Hook to get user roles
+
 export const useUserRoles = () => {
   return useQuery({
-    queryKey: ['userRoles'], // Changed from string to array
-    queryFn: () => userService.getUserRoles().then(res => res.data),
+    queryKey: ['userRoles'], 
+    queryFn: async () => {
+      try {
+        const { data } = await userService.getUserRoles();
+        console.log('Roles data structure:', data);
+        
+        // Handle different response formats
+        if (data && Array.isArray(data)) {
+          return data;
+        } else if (data && data.data && Array.isArray(data.data)) {
+          return data.data;
+        } else {
+          console.warn('Unknown role data format:', data);
+          return [
+            { id: 'admin', name: 'ຜູ້ດູແລລະບົບ' },
+            { id: 'manager', name: 'ຜູ້ຈັດການ' },
+            { id: 'staff', name: 'ພະນັກງານ' },
+            { id: 'customer', name: 'ລູກຄ້າ' }
+          ];
+        }
+      } catch (error) {
+        console.error('Error fetching user roles:', error);
+        // Provide default roles in case of error
+        return [
+          { id: 'admin', name: 'ຜູ້ດູແລລະບົບ' },
+          { id: 'manager', name: 'ຜູ້ຈັດການ' },
+          { id: 'staff', name: 'ພະນັກງານ' },
+          { id: 'customer', name: 'ລູກຄ້າ' }
+        ];
+      }
+    },
     staleTime: 1000 * 60 * 30, // 30 minutes
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 };
 
-// Helper function to get user role badge color
-export const getUserRoleColor = (role) => {
+
+
+
+
+export const getUserSingleRole = (user) => {
+  
+  if (Array.isArray(user.roles) && user.roles.length > 0) {
+    
+    if (typeof user.roles[0] === 'object') {
+      return user.roles[0];
+    }
+    
+    return { id: user.roles[0], name: getRoleName(user.roles[0]) };
+  } 
+  
+  else if (user.role && typeof user.role === 'object') {
+    return user.role;
+  } 
+  
+  else if (user.role) {
+    return { id: user.role, name: getRoleName(user.role) };
+  }
+  
+  
+  return { id: 'customer', name: 'ລູກຄ້າ' };
+};
+
+
+export const getRoleName = (roleId) => {
+  // Convert roleId to string in case it's a number
+  const roleIdStr = roleId?.toString()?.toLowerCase();
+  
+  const roleMap = {
+    'admin': 'ຜູ້ດູແລລະບົບ',
+    'staff': 'ພະນັກງານ',
+    'manager': 'ຜູ້ຈັດການ',
+    'customer': 'ລູກຄ້າ',
+    '1': 'ຜູ້ດູແລລະບົບ', // In case role IDs are numeric
+    '2': 'ຜູ້ຈັດການ',
+    '3': 'ພະນັກງານ',
+    '4': 'ລູກຄ້າ'
+  };
+  
+  return roleMap[roleIdStr] || roleId;
+};
+
+
+export const getUserRoleColor = (user) => {
+  const role = typeof user === 'string' ? user : getUserSingleRole(user).id;
+  
   switch (role?.toLowerCase()) {
     case 'admin':
       return 'bg-red-100 text-red-800';
@@ -149,7 +274,6 @@ export const getUserRoleColor = (role) => {
   }
 };
 
-// Helper function to get user status badge color
 export const getUserStatusColor = (status) => {
   switch (status?.toLowerCase()) {
     case 'active':

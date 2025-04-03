@@ -20,19 +20,19 @@ const getToken = () => {
   return null;
 };
 
-// Callbacks สำหรับจัดการสถานะการโหลด
+
 const loadingCallbacks = {
   startLoading: () => {},
   stopLoading: () => {}
 };
 
-// ตัวแปรเพื่อเก็บ dispatch function ที่จะถูกตั้งค่าภายหลัง
+
 let dispatchFunction = null;
 let logoutAction = null;
 let startLoadingAction = null;
 let stopLoadingAction = null;
 
-// ฟังก์ชันสำหรับตั้งค่า Redux actions และ dispatch
+
 export const setupApiRedux = ({ dispatch, actions }) => {
   dispatchFunction = dispatch;
   if (actions) {
@@ -42,7 +42,7 @@ export const setupApiRedux = ({ dispatch, actions }) => {
   }
 };
 
-// ฟังก์ชันสำหรับตั้งค่า callbacks
+
 export const setLoadingCallbacks = (callbacks) => {
   if (callbacks) {
     loadingCallbacks.startLoading = callbacks.startLoading || (() => {});
@@ -50,10 +50,10 @@ export const setLoadingCallbacks = (callbacks) => {
   }
 };
 
-// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Start loading...
+    
+    console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`, config.data);
     
     const token = getToken();
     if (token) {
@@ -63,47 +63,61 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    // Stop loading...
+    console.error('API Request Error:', error);
     return Promise.reject(error);
   }
 );
 
+
 api.interceptors.response.use(
   (response) => {
+    
+    console.log(`API Response: ${response.status} ${response.config.url}`, response.data);
     return response;
   },
   (error) => {
+    console.error('API Response Error:', error);
     
     if (error.response) {
-      switch (error.response.status) {
-        case 401:
+      const status = error.response.status;
+      const url = error.config?.url;
+      console.error(`API Error ${status} from ${url}:`, error.response.data);
+      
+      switch (status) {
+        case 400: 
+          console.error('400 Bad Request - Check if request data is correct:', {
+            url,
+            method: error.config?.method,
+            requestData: error.config?.data,
+            responseData: error.response.data
+          });
+          break;
+          
+        case 401: 
+          console.error('401 Unauthorized - Authentication failed');
           if (dispatchFunction && logoutAction) {
-            console.log('401 Unauthorized: Logging out...');
             dispatchFunction(logoutAction());
           }
           break;
           
-        case 403:
-          console.error('403 Forbidden: No permission');
-          toast?.error('ไม่มีสิทธิ์ในการเข้าถึง');
+        case 403: 
+          console.error('403 Forbidden - No permission');
           break;
           
-        case 404:
+        case 404: 
           console.error('404 Not Found:', error.config?.url);
           break;
           
-        case 422:
+        case 422: 
           console.error('422 Validation Error:', error.response.data);
           break;
           
-        case 500:
+        case 500: 
           console.error('500 Server Error');
-          toast?.error('เกิดข้อผิดพลาดที่เซิร์ฟเวอร์');
           break;
       }
     } else if (error.request) {
       console.error('No response received:', error.request);
-      toast?.error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
     } else {
       console.error('Request setup error:', error.message);
     }
@@ -114,20 +128,45 @@ api.interceptors.response.use(
 
 export const authService = {
   login: (credentials) => {
-    return api.post('/auth/login', credentials)
+    
+    const loginData = {
+      email: credentials.email,
+      password: credentials.password
+    };
+    
+    console.log('Auth Service: Sending login data:', JSON.stringify(loginData));
+    
+    return api.post('/auth/login', loginData)
       .then(response => {
-        // เก็บ token ใน cookie
+        console.log('Auth Service: Login response received:', response.data);
+        
+        
         if (response.data && response.data.access_token) {
           Cookies.set('auth_token', response.data.access_token, { expires: 7 });
         }
+        
         return response;
+      })
+      .catch(error => {
+        console.error('Auth Service: Login error:', error);
+        
+        
+        if (error.response) {
+          console.error('Error response:', {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers
+          });
+        }
+        
+        throw error; 
       });
   },
   
   logout: () => {
     return api.post('/auth/logout')
       .then(response => {
-        // ลบ token จาก cookie
+        
         Cookies.remove('auth_token');
         return response;
       });
@@ -135,97 +174,32 @@ export const authService = {
   
   getProfile: () => api.get('/auth/profile'),
   
-  // เพิ่มฟังก์ชัน verify token
   verifyToken: () => api.get('/auth/verify')
 };
+
 export const productService = {
-  getAllFoodProducts: async (params = {}) => {
-    try {
-      const response = await api.get('/food-menu', { params });
-      return response.data || { products: [], totalItems: 0, totalPages: 0 }; // Default ค่า
-    } catch (error) {
-      console.error('Get Food Products Error:', error);
-      return { products: [], totalItems: 0, totalPages: 0, error: error.message };
+  // Products APIs
+  getAllProducts: (params) => api.get('/products', { params }),
+  getProductById: (id) => api.get(`/products/${id}`),
+  createProduct: (data) => api.post('/products', data),
+  updateProduct: (id, data) => api.patch(`/products/${id}`, data),
+  deleteProduct: (id) => api.delete(`/products/${id}`),
+  
+  // Categories APIs
+  getCategories: () => api.get('/categories'),
+  getCategoryById: (id) => api.get(`/categories/${id}`),
+  createCategory: (data) => api.post('/categories', data),
+  updateCategory: (id, data) => api.patch(`/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/categories/${id}`),
+  
+  // Image upload
+  uploadImage: (formData) => api.post('/cloudinary/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
     }
-  },
-
-  getAllBeverageProducts: async (params = {}) => {
-    try {
-      const response = await api.get('/beverage-menu', { params });
-      return response.data || { products: [], totalItems: 0, totalPages: 0 }; // Default ค่า
-    } catch (error) {
-      console.error('Get Beverage Products Error:', error);
-      return { products: [], totalItems: 0, totalPages: 0, error: error.message };
-    }
-  },
-
-  getCategories: async () => {
-    try {
-      const response = await api.get('/menu-categories');
-      return response.data || []; // Default เป็น array ว่าง
-    } catch (error) {
-      console.error('Get Categories Error:', error);
-      return []; // คืนค่า array ว่างถ้าล้มเหลว
-    }
-  },
-
-  // ฟังก์ชันอื่นๆ คงเดิม แต่ควรเพิ่ม try-catch ถ้ายังไม่มี
-  getFoodProductById: async (id) => {
-    try {
-      const response = await api.get(`/food-menu/${id}`);
-      return response.data || {};
-    } catch (error) {
-      return { error: error.message };
-    }
-  },
-
-  getBeverageProductById: async (id) => {
-    try {
-      const response = await api.get(`/beverage-menu/${id}`);
-      return response.data || {};
-    } catch (error) {
-      return { error: error.message };
-    }
-  },
-
-  createFoodProduct: async (productData) => {
-    const response = await api.post('/food-menu', productData);
-    return response.data;
-  },
-
-  updateFoodProduct: async (id, productData) => {
-    const response = await api.put(`/food-menu/${id}`, productData);
-    return response.data;
-  },
-
-  deleteFoodProduct: async (id) => {
-    const response = await api.delete(`/food-menu/${id}`);
-    return response.data;
-  },
-
-  createBeverageProduct: async (productData) => {
-    const response = await api.post('/beverage-menu', productData);
-    return response.data;
-  },
-
-  updateBeverageProduct: async (id, productData) => {
-    const response = await api.put(`/beverage-menu/${id}`, productData);
-    return response.data;
-  },
-
-  deleteBeverageProduct: async (id) => {
-    const response = await api.delete(`/beverage-menu/${id}`);
-    return response.data;
-  },
-
-  uploadImage: async (formData) => {
-    const response = await api.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
+  })
 };
-// Order services
+
 export const orderService = {
   getAllOrders: (params) => api.get('/orders', { params }),
   getOrderById: (id) => api.get(`/orders/${id}`),
@@ -234,52 +208,34 @@ export const orderService = {
   deleteOrder: (id) => api.delete(`/orders/${id}`)
 };
 
-// User services
+
 export const userService = {
   getAllUsers: (params) => api.get('/users', { params }),
   getUserById: (id) => api.get(`/users/${id}`),
   createUser: (userData) => api.post('/users', userData),
   updateUser: (id, userData) => api.patch(`/users/${id}`, userData),
   deleteUser: (id) => api.delete(`/users/${id}`),
-  getUserRoles: () => api.get('/roles'),
-  getUserRolesByUserId: (userId) => {
-    return api.get(`/roles/user/${userId}`);
-  },
-  changeUserRole: (userId, roleId) => {
-    console.log(`กำลังเปลี่ยนตำแหน่งสำหรับผู้ใช้ ${userId} เป็น ${roleId}`);
-    return api.post('/roles/assign', { 
-      userId: Number(userId), 
-      roleId: Number(roleId) 
-    });
-  },
-};
-export const roleService = {
-  // Get all roles
-  getAll: () => api.get('/roles'),
-  
-  // Get a specific role
-  getById: (id) => api.get(`/roles/${id}`),
-  
-  // Create a new role
-  create: (roleData) => api.post('/roles', roleData),
-  
-  // Update an existing role
-  update: (id, roleData) => api.patch(`/roles/${id}`, roleData),
-  
-  // Delete a role
-  delete: (id) => api.delete(`/roles/${id}`),
-  
-  // Assign role to user
-  assignToUser: (userId, roleId) => api.post('/roles/assign', { userId, roleId }),
-  
-  // Remove role from user
-  removeFromUser: (userId, roleId) => api.delete(`/roles/user/${userId}/role/${roleId}`),
-  
-  // Get user roles
-  getUserRoles: (userId) => api.get(`/roles/user/${userId}`),
+  getUserRoles: () => api.get('/roles'), 
+  getUserRolesByUserId: (userId) => api.get(`/users/${userId}/roles`),
+  changeUserRole: (userId, roleId) =>
+    api.post('/roles/assign', { userId: Number(userId), roleId: Number(roleId) }),
 };
 
-// Analytics services
+
+export const roleService = {
+  getAllRoles: () => api.get('/roles'),
+  getRoleById: (id) => api.get(`/roles/${id}`),
+  createRole: (roleData) => api.post('/roles', roleData),
+  updateRole: (id, roleData) => api.patch(`/roles/${id}`, roleData),
+  deleteRole: (id) => api.delete(`/roles/${id}`),
+  assignRoleToUser: (userId, roleId) =>
+    api.post('/roles/assign', { userId: Number(userId), roleId: Number(roleId) }),
+  removeRoleFromUser: (userId, roleId) =>
+    api.delete(`/roles/user/${userId}/role/${roleId}`),
+  getUserRoles: (userId) => api.get(`/users/${userId}/roles`),
+};
+
+
 export const analyticsService = {
   getSalesAnalytics: (timeRange, params) => api.get(`/analytics/sales/${timeRange}`, { params }),
   getProductAnalytics: (params) => api.get('/analytics/products', { params }),
@@ -287,7 +243,7 @@ export const analyticsService = {
   getDashboardStats: () => api.get('/analytics/dashboard')
 };
 
-// Review services
+
 export const reviewService = {
   getAllReviews: (params) => api.get('/reviews', { params }),
   approveReview: (id) => api.patch(`/reviews/${id}/approve`),
@@ -295,7 +251,7 @@ export const reviewService = {
   deleteReview: (id) => api.delete(`/reviews/${id}`)
 };
 
-// Notification services
+
 export const notificationService = {
   getNotifications: () => api.get('/notifications'),
   markAsRead: (id) => api.patch(`/notifications/${id}/read`),
@@ -303,7 +259,7 @@ export const notificationService = {
   deleteNotification: (id) => api.delete(`/notifications/${id}`)
 };
 
-// Shipping services
+
 export const shippingService = {
   getShippingMethods: () => api.get('/shipping/methods'),
   updateShippingMethod: (id, data) => api.put(`/shipping/methods/${id}`, data),
@@ -313,7 +269,7 @@ export const shippingService = {
   updateShippingZone: (id, data) => api.put(`/shipping/zones/${id}`, data)
 };
 
-// Promotion services
+
 export const promotionService = {
   getAllPromotions: (params) => api.get('/promotions', { params }),
   getPromotionById: (id) => api.get(`/promotions/${id}`),
@@ -323,7 +279,7 @@ export const promotionService = {
   togglePromotionStatus: (id) => api.patch(`/promotions/${id}/toggle`)
 };
 
-// CRM services
+
 export const crmService = {
   getCustomers: (params) => api.get('/customers', { params }),
   getCustomerById: (id) => api.get(`/customers/${id}`),
@@ -335,7 +291,7 @@ export const crmService = {
   })
 };
 
-// Blog services
+
 export const blogService = {
   getAllPosts: (params) => api.get('/blog/posts', { params }),
   getPostById: (id) => api.get(`/blog/posts/${id}`),
@@ -348,7 +304,7 @@ export const blogService = {
   deleteCategory: (id) => api.delete(`/blog/categories/${id}`)
 };
 
-// Gallery services
+
 export const galleryService = {
   getAllImages: (params) => api.get('/gallery', { params }),
   uploadImages: (formData) => api.post('/gallery/upload', formData, {
@@ -360,7 +316,7 @@ export const galleryService = {
   updateImageDetails: (id, data) => api.put(`/gallery/${id}`, data)
 };
 
-// Slideshow services
+
 export const slideshowService = {
   getSlides: () => api.get('/slideshow'),
   updateSlide: (id, data) => api.put(`/slideshow/${id}`, data),
@@ -369,7 +325,7 @@ export const slideshowService = {
   reorderSlides: (data) => api.put('/slideshow/reorder', data)
 };
 
-// Settings services
+
 export const settingsService = {
   getGeneralSettings: () => api.get('/settings/general'),
   updateGeneralSettings: (data) => api.put('/settings/general', data),

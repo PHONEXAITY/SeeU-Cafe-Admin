@@ -138,6 +138,7 @@ const ProductForm = ({ product = null, mode = 'create' }) => {
         price: parseFloat(formData.price),
         category_id: parseInt(formData.category_id),
         status: formData.status,
+        type: formData.type,
         image: imageUrl
       };
       
@@ -152,20 +153,12 @@ const ProductForm = ({ product = null, mode = 'create' }) => {
         }
       }
       
-      // Create or update product
+      // Create or update product using the unified API
       if (mode === 'create') {
-        if (formData.type === 'food') {
-          await productService.createFoodProduct(productData);
-        } else {
-          await productService.createBeverageProduct(productData);
-        }
+        await productService.createProduct(productData);
         toast.success('ສ້າງສິນຄ້າສຳເລັດແລ້ວ');
       } else {
-        if (formData.type === 'food') {
-          await productService.updateFoodProduct(product.id, productData);
-        } else {
-          await productService.updateBeverageProduct(product.id, productData);
-        }
+        await productService.updateProduct(product.id, productData);
         toast.success('ອັບເດດສິນຄ້າສຳເລັດແລ້ວ');
       }
       

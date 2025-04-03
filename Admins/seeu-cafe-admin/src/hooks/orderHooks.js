@@ -7,7 +7,10 @@ import { toast } from 'react-hot-toast';
 export const useOrders = (filters = {}) => {
   return useQuery({
     queryKey: ['orders', filters],
-    queryFn: () => orderService.getAllOrders(filters).then(res => res.data),
+    queryFn: async () => {
+      const { data } = await orderService.getAllOrders(filters);
+      return data || { orders: [], totalItems: 0, totalPages: 0 };
+    },
     keepPreviousData: true,
     staleTime: 1000 * 60 * 2, // 2 นาที
   });
@@ -17,7 +20,11 @@ export const useOrders = (filters = {}) => {
 export const useOrder = (id) => {
   return useQuery({
     queryKey: ['order', id],
-    queryFn: () => orderService.getOrderById(id).then(res => res.data),
+    queryFn: async () => {
+      if (!id) return null;
+      const { data } = await orderService.getOrderById(id);
+      return data;
+    },
     enabled: !!id, // ทำงานเมื่อมี ID เท่านั้น
   });
 };

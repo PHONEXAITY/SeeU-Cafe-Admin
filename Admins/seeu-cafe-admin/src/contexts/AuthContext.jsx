@@ -76,10 +76,11 @@ const login = async (credentials) => {
     
     console.log('Login attempt with credentials:', JSON.stringify(apiCredentials));
     
-    const { data } = await authService.login(apiCredentials);
+    const response = await authService.login(apiCredentials);
+    const data = response.data;
     console.log('Login response:', data);
     
-    if (!data || (!data.token && !data.access_token)) {
+    if (!data || !data.access_token) {
       throw new Error('Invalid response from server: No token received');
     }
     
@@ -88,9 +89,8 @@ const login = async (credentials) => {
       throw new Error('Unauthorized: Only administrators can access this system');
     }
     
-    // Store token and user data (support both token and access_token formats)
-    const tokenValue = data.access_token || data.token;
-    setLocalStorage('token', tokenValue);
+    // Store token and user data
+    setLocalStorage('token', data.access_token);
     setLocalStorage('user', JSON.stringify(data.user));
     
     // อัปเดตสถานะผู้ใช้
@@ -100,13 +100,7 @@ const login = async (credentials) => {
     toast.success('เข้าสู่ระบบสำเร็จ');
     
     // ใช้ router.push เพื่อนำทางไปยังหน้า dashboard
-    // ในฟังก์ชัน login ของ AuthContext
-router.push('/dashboard');
-console.log('Router.push called with /dashboard');
-
-// หรือลองใช้ window.location.href โดยตรง
-console.log('Redirecting to dashboard with window.location.href');
-window.location.href = '/dashboard';
+    router.push('/dashboard');
     
     return true;
   } catch (error) {

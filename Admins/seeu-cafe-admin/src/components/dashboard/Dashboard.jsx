@@ -1,74 +1,92 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react';
-import { 
-  FaShoppingCart, FaUsers, FaMoneyBillWave, FaBoxOpen, 
-  FaChartLine, FaSpinner, FaArrowUp, FaArrowDown, FaCalendarAlt,
-  FaCheck, FaExclamationTriangle
-} from 'react-icons/fa';
-import { useDashboardStats, useSalesAnalytics, timeRangeOptions, formatDateRange } from '@/hooks/analyticsHooks';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { formatCurrency } from '@/hooks/orderHooks';
-import Link from 'next/link';
-import Image from 'next/image';
+import React, { useState } from "react";
+import {
+  FaShoppingCart,
+  FaUsers,
+  FaMoneyBillWave,
+  FaBoxOpen,
+  FaChartLine,
+  FaSpinner,
+  FaArrowUp,
+  FaArrowDown,
+  FaCalendarAlt,
+  FaCheck,
+  FaExclamationTriangle,
+} from "react-icons/fa";
+import {
+  useDashboardStats,
+  useSalesAnalytics,
+  timeRangeOptions,
+  formatDateRange,
+} from "@/hooks/analyticsHooks";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { formatCurrency } from "@/hooks/orderHooks";
+import Link from "next/link";
+import Image from "next/image";
 
 const Dashboard = () => {
-  const [timeRange, setTimeRange] = useState('7d');
-  
-  // Fetch dashboard stats
-  const { 
-    data: stats, 
-    isLoading: isLoadingStats, 
-    isError: isStatsError 
+  const [timeRange, setTimeRange] = useState("7d");
+
+  const {
+    data: stats,
+    isLoading: isLoadingStats,
+    isError: isStatsError,
   } = useDashboardStats();
-  
-  // Fetch sales analytics data
-  const { 
-    data: salesData, 
-    isLoading: isLoadingSales, 
-    isError: isSalesError 
+
+  const {
+    data: salesData,
+    isLoading: isLoadingSales,
+    isError: isSalesError,
   } = useSalesAnalytics(timeRange);
 
-  // Stats cards data
   const statsCards = [
     {
-      title: 'Total Orders',
+      title: "Total Orders",
       value: stats?.totalOrders || 0,
       change: stats?.orderChange || 0,
       icon: <FaShoppingCart className="w-8 h-8 text-blue-500" />,
-      color: 'blue',
+      color: "blue",
     },
     {
-      title: 'Total Revenue',
+      title: "Total Revenue",
       value: formatCurrency(stats?.totalRevenue || 0),
       change: stats?.revenueChange || 0,
       icon: <FaMoneyBillWave className="w-8 h-8 text-green-500" />,
-      color: 'green',
+      color: "green",
     },
     {
-      title: 'Total Customers',
+      title: "Total Customers",
       value: stats?.totalCustomers || 0,
       change: stats?.customerChange || 0,
       icon: <FaUsers className="w-8 h-8 text-purple-500" />,
-      color: 'purple',
+      color: "purple",
     },
     {
-      title: 'Total Products',
+      title: "Total Products",
       value: stats?.totalProducts || 0,
       change: stats?.productChange || 0,
       icon: <FaBoxOpen className="w-8 h-8 text-orange-500" />,
-      color: 'orange',
+      color: "orange",
     },
   ];
 
-  // Handle time range change
   const handleTimeRangeChange = (e) => {
     setTimeRange(e.target.value);
   };
 
   return (
     <div className="space-y-6">
-      {/* Page Title */}
+      {}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <h1 className="text-2xl font-semibold text-gray-800">Dashboard</h1>
         <div className="flex items-center mt-2 sm:mt-0">
@@ -87,13 +105,12 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoadingStats ? (
-          // Loading state
           [...Array(4)].map((_, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className="bg-white rounded-lg shadow-md p-6 flex items-center animate-pulse"
             >
               <div className="w-12 h-12 bg-gray-200 rounded-full mr-4"></div>
@@ -105,30 +122,30 @@ const Dashboard = () => {
             </div>
           ))
         ) : isStatsError ? (
-          // Error state
           <div className="col-span-4 text-center py-10">
             <p className="text-red-500">Failed to load dashboard statistics.</p>
           </div>
         ) : (
-          // Actual stats cards
           statsCards.map((card, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className="bg-white rounded-lg shadow-md p-6 flex items-start"
             >
               <div className={`p-3 rounded-full bg-${card.color}-100 mr-4`}>
                 {card.icon}
               </div>
               <div>
-                <h3 className="text-lg font-medium text-gray-500">{card.title}</h3>
+                <h3 className="text-lg font-medium text-gray-500">
+                  {card.title}
+                </h3>
                 <div className="flex items-baseline">
                   <span className="text-2xl font-semibold text-gray-800">
                     {card.value}
                   </span>
                   {card.change !== 0 && (
-                    <span 
+                    <span
                       className={`ml-2 flex items-center text-sm ${
-                        card.change > 0 ? 'text-green-500' : 'text-red-500'
+                        card.change > 0 ? "text-green-500" : "text-red-500"
                       }`}
                     >
                       {card.change > 0 ? (
@@ -140,81 +157,91 @@ const Dashboard = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 mt-1">vs. previous period</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  vs. previous period
+                </p>
               </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Sales Chart */}
+      {}
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div>
-            <h2 className="text-lg font-medium text-gray-800">Sales Overview</h2>
-            <p className="text-sm text-gray-500">{formatDateRange(timeRange)}</p>
+            <h2 className="text-lg font-medium text-gray-800">
+              Sales Overview
+            </h2>
+            <p className="text-sm text-gray-500">
+              {formatDateRange(timeRange)}
+            </p>
           </div>
           <div className="flex items-center mt-2 sm:mt-0">
             <FaChartLine className="text-brown-600 mr-2" />
             <span className="text-gray-700 font-medium">
-              {isLoadingSales ? 'Loading...' : `${salesData?.salesData?.length || 0} data points`}
+              {isLoadingSales
+                ? "Loading..."
+                : `${salesData?.salesData?.length || 0} data points`}
             </span>
           </div>
         </div>
 
         <div className="h-80">
           {isLoadingSales ? (
-            // Loading state for chart
             <div className="flex items-center justify-center h-full">
               <FaSpinner className="w-8 h-8 text-brown-600 animate-spin" />
               <span className="ml-2 text-gray-500">Loading chart data...</span>
             </div>
           ) : isSalesError ? (
-            // Error state for chart
             <div className="flex items-center justify-center h-full">
               <p className="text-red-500">Failed to load sales data.</p>
             </div>
           ) : salesData?.salesData?.length === 0 ? (
-            // Empty state for chart
             <div className="flex flex-col items-center justify-center h-full">
-              <p className="text-gray-500">No sales data available for the selected period.</p>
+              <p className="text-gray-500">
+                No sales data available for the selected period.
+              </p>
             </div>
           ) : (
-            // Actual chart
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={salesData?.salesData}
                 margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   tick={{ fontSize: 12 }}
                   tickFormatter={(value) => {
-                    // Format date based on time range
                     const date = new Date(value);
-                    if (timeRange === '7d' || timeRange === '30d') {
-                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    if (timeRange === "7d" || timeRange === "30d") {
+                      return date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      });
                     } else {
-                      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                      return date.toLocaleDateString("en-US", {
+                        month: "short",
+                        year: "2-digit",
+                      });
                     }
                   }}
                 />
-                <YAxis 
+                <YAxis
                   tick={{ fontSize: 12 }}
                   tickFormatter={(value) => {
-                    // Format currency
-                    return formatCurrency(value).replace('THB', '฿');
+                    return formatCurrency(value).replace("THB", "฿");
                   }}
                 />
-                <Tooltip 
-                  formatter={(value) => [formatCurrency(value), 'Revenue']}
+                <Tooltip
+                  formatter={(value) => [formatCurrency(value), "Revenue"]}
                   labelFormatter={(label) => {
-                    return new Date(label).toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
+                    return new Date(label).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
                     });
                   }}
                 />
@@ -237,7 +264,6 @@ const Dashboard = () => {
                   activeDot={{ r: 6, strokeWidth: 2 }}
                   name="Orders"
                   yAxisId={1}
-                  // Hide this axis
                   hide={true}
                 />
               </LineChart>
@@ -246,22 +272,21 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Recent Orders and Top Products sections */}
+      {}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
+        {}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-medium text-gray-800">Recent Orders</h2>
-            <Link 
-              href="/orders" 
+            <Link
+              href="/orders"
               className="text-sm text-brown-600 hover:text-brown-800 font-medium"
             >
               View All
             </Link>
           </div>
-          
+
           {isLoadingStats ? (
-            // Loading state for recent orders
             [...Array(5)].map((_, i) => (
               <div key={i} className="mb-4 animate-pulse">
                 <div className="flex items-center">
@@ -275,15 +300,16 @@ const Dashboard = () => {
               </div>
             ))
           ) : isStatsError || !stats?.recentOrders?.length ? (
-            // Error or empty state for recent orders
             <div className="py-6 text-center">
               <p className="text-gray-500">No recent orders available.</p>
             </div>
           ) : (
-            // Actual recent orders
             <div className="overflow-y-auto max-h-80">
               {stats.recentOrders.map((order) => (
-                <div key={order.id} className="mb-4 pb-4 border-b last:border-0">
+                <div
+                  key={order.id}
+                  className="mb-4 pb-4 border-b last:border-0"
+                >
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
                       <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
@@ -297,27 +323,28 @@ const Dashboard = () => {
                             Order #{order.orderNumber}
                           </h3>
                           <p className="text-xs text-gray-500">
-                            {new Date(order.date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
+                            {new Date(order.date).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
                             })}
                           </p>
                         </div>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            order.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : order.status === 'processing'
-                              ? 'bg-blue-100 text-blue-800'
-                              : order.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                            order.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : order.status === "processing"
+                              ? "bg-blue-100 text-blue-800"
+                              : order.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
                           }`}
                         >
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          {order.status.charAt(0).toUpperCase() +
+                            order.status.slice(1)}
                         </span>
                       </div>
                       <div className="mt-1 flex justify-between">
@@ -339,20 +366,19 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Top Products */}
+        {}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-medium text-gray-800">Top Products</h2>
-            <Link 
-              href="/products" 
+            <Link
+              href="/products"
               className="text-sm text-brown-600 hover:text-brown-800 font-medium"
             >
               View All
             </Link>
           </div>
-          
+
           {isLoadingStats ? (
-            // Loading state for top products
             [...Array(5)].map((_, i) => (
               <div key={i} className="mb-4 animate-pulse">
                 <div className="flex items-center">
@@ -366,15 +392,16 @@ const Dashboard = () => {
               </div>
             ))
           ) : isStatsError || !stats?.topProducts?.length ? (
-            // Error or empty state for top products
             <div className="py-6 text-center">
               <p className="text-gray-500">No product data available.</p>
             </div>
           ) : (
-            // Actual top products
             <div className="overflow-y-auto max-h-80">
               {stats.topProducts.map((product, index) => (
-                <div key={product.id} className="mb-4 pb-4 border-b last:border-0">
+                <div
+                  key={product.id}
+                  className="mb-4 pb-4 border-b last:border-0"
+                >
                   <div className="flex items-center">
                     <div className="flex-shrink-0 mr-4">
                       <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-100">
@@ -419,22 +446,23 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Inventory Alerts and Recent Reviews */}
+      {}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Inventory Alerts */}
+        {}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-800">Inventory Alerts</h2>
-            <Link 
-              href="/products?lowStock=true" 
+            <h2 className="text-lg font-medium text-gray-800">
+              Inventory Alerts
+            </h2>
+            <Link
+              href="/products?lowStock=true"
               className="text-sm text-brown-600 hover:text-brown-800 font-medium"
             >
               View All
             </Link>
           </div>
-          
+
           {isLoadingStats ? (
-            // Loading state for inventory alerts
             [...Array(3)].map((_, i) => (
               <div key={i} className="mb-3 animate-pulse">
                 <div className="flex items-center">
@@ -447,18 +475,18 @@ const Dashboard = () => {
               </div>
             ))
           ) : isStatsError || !stats?.lowStockProducts?.length ? (
-            // No alerts state
             <div className="py-6 text-center flex flex-col items-center">
               <div className="bg-green-100 rounded-full p-3 mb-2">
                 <FaCheck className="text-green-500 w-6 h-6" />
               </div>
-              <p className="text-gray-500">All products have sufficient inventory.</p>
+              <p className="text-gray-500">
+                All products have sufficient inventory.
+              </p>
             </div>
           ) : (
-            // Actual inventory alerts
             <div className="space-y-3">
               {stats.lowStockProducts.map((product) => (
-                <div 
+                <div
                   key={product.id}
                   className="flex items-center p-3 bg-red-50 rounded-lg"
                 >
@@ -472,7 +500,11 @@ const Dashboard = () => {
                       {product.name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Only <span className="font-semibold text-red-600">{product.stock}</span> items left in stock
+                      Only{" "}
+                      <span className="font-semibold text-red-600">
+                        {product.stock}
+                      </span>{" "}
+                      items left in stock
                     </p>
                   </div>
                   <Link
@@ -486,21 +518,22 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-        
-        {/* Recent Reviews */}
+
+        {}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-800">Recent Reviews</h2>
-            <Link 
-              href="/reviews" 
+            <h2 className="text-lg font-medium text-gray-800">
+              Recent Reviews
+            </h2>
+            <Link
+              href="/reviews"
               className="text-sm text-brown-600 hover:text-brown-800 font-medium"
             >
               View All
             </Link>
           </div>
-          
+
           {isLoadingStats ? (
-            // Loading state for recent reviews
             [...Array(3)].map((_, i) => (
               <div key={i} className="mb-4 animate-pulse">
                 <div className="flex items-start">
@@ -515,12 +548,10 @@ const Dashboard = () => {
               </div>
             ))
           ) : isStatsError || !stats?.recentReviews?.length ? (
-            // No reviews state
             <div className="py-6 text-center">
               <p className="text-gray-500">No recent reviews.</p>
             </div>
           ) : (
-            // Actual recent reviews
             <div className="space-y-4 overflow-y-auto max-h-72">
               {stats.recentReviews.map((review) => (
                 <div key={review.id} className="border-b pb-4 last:border-0">
@@ -536,7 +567,7 @@ const Dashboard = () => {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-brown-100 text-brown-600">
-                            {review.user?.name?.charAt(0) || 'U'}
+                            {review.user?.name?.charAt(0) || "U"}
                           </div>
                         )}
                       </div>
@@ -544,13 +575,13 @@ const Dashboard = () => {
                     <div className="flex-1">
                       <div className="flex justify-between items-center">
                         <h3 className="text-sm font-medium text-gray-800">
-                          {review.user?.name || 'Anonymous'}
+                          {review.user?.name || "Anonymous"}
                         </h3>
                         <span className="text-xs text-gray-500">
-                          {new Date(review.date).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
+                          {new Date(review.date).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
                           })}
                         </span>
                       </div>
@@ -559,7 +590,9 @@ const Dashboard = () => {
                           <svg
                             key={i}
                             className={`w-4 h-4 ${
-                              i < review.rating ? 'text-yellow-400' : 'text-gray-300'
+                              i < review.rating
+                                ? "text-yellow-400"
+                                : "text-gray-300"
                             }`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
@@ -572,10 +605,12 @@ const Dashboard = () => {
                           </svg>
                         ))}
                         <span className="ml-1 text-xs text-gray-500">
-                          for "{review.product?.name || 'Unknown Product'}"
+                          for "{review.product?.name || "Unknown Product"}"
                         </span>
                       </div>
-                      <p className="mt-2 text-sm text-gray-700">{review.text}</p>
+                      <p className="mt-2 text-sm text-gray-700">
+                        {review.text}
+                      </p>
                     </div>
                   </div>
                 </div>

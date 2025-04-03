@@ -22,16 +22,41 @@ const CreateUser = () => {
   const [roles, setRoles] = useState([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
 
-  // Load roles from API
+  
   useEffect(() => {
     const fetchRoles = async () => {
       setIsLoadingRoles(true);
       try {
         const response = await userService.getUserRoles();
-        setRoles(response.data || []);
+        
+        // Handle different response formats
+        let roleData = [];
+        if (response.data && Array.isArray(response.data)) {
+          roleData = response.data;
+        } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+          roleData = response.data.data;
+        } else {
+          console.warn('Unknown role data format:', response.data);
+          roleData = [
+            { id: 'admin', name: 'ຜູ້ດູແລລະບົບ' },
+            { id: 'manager', name: 'ຜູ້ຈັດການ' },
+            { id: 'staff', name: 'ພະນັກງານ' },
+            { id: 'customer', name: 'ລູກຄ້າ' }
+          ];
+        }
+        
+        setRoles(roleData);
       } catch (error) {
         console.error('Error fetching user roles:', error);
-        toast.error('ไม่สามารถโหลดข้อมูลตำแหน่งได้');
+        toast.error('ບໍ່ສາມາດໂຫລດຂໍ້ມູນຕຳແໜ່ງໄດ້');
+        
+        // Set default roles in case of error
+        setRoles([
+          { id: 'admin', name: 'ຜູ້ດູແລລະບົບ' },
+          { id: 'manager', name: 'ຜູ້ຈັດການ' },
+          { id: 'staff', name: 'ພະນັກງານ' },
+          { id: 'customer', name: 'ລູກຄ້າ' }
+        ]);
       } finally {
         setIsLoadingRoles(false);
       }
@@ -40,40 +65,40 @@ const CreateUser = () => {
     fetchRoles();
   }, []);
 
-  // Form validation
+  
   const validateForm = () => {
     const newErrors = {};
     
-    // Check first name
+    
     if (!formData.first_name.trim()) {
       newErrors.first_name = 'ກະລຸນາປ້ອນຊື່';
     }
     
-    // Check last name
+    
     if (!formData.last_name.trim()) {
       newErrors.last_name = 'ກະລຸນາປ້ອນນາມສະກຸນ';
     }
     
-    // Check email
+    
     if (!formData.email.trim()) {
       newErrors.email = 'ກະລຸນາປ້ອນອີເມວ';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'ຮູບແບບອີເມວບໍ່ຖືກຕ້ອງ';
     }
     
-    // Check password
+    
     if (!formData.password) {
       newErrors.password = 'ກະລຸນາປ້ອນລະຫັດຜ່ານ';
     } else if (formData.password.length < 6) {
       newErrors.password = 'ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 6 ຕົວອັກສອນ';
     }
     
-    // Check password confirmation
+    
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'ລະຫັດຜ່ານບໍ່ກົງກັນ';
     }
     
-    // Check role if needed
+    
     if (!formData.role) {
       newErrors.role = 'ກະລຸນາເລືອກຕຳແໜ່ງ';
     }
@@ -82,7 +107,6 @@ const CreateUser = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -93,7 +117,7 @@ const CreateUser = () => {
     setIsSubmitting(true);
     
     try {
-      // Create user data object based on backend DTO requirements
+      // Prepare user data for API call
       const userData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
@@ -103,35 +127,65 @@ const CreateUser = () => {
         address: formData.address || null
       };
       
-      // Log request for debugging
-      console.log('Submitting user data:', userData);
+      console.log('ກຳລັງສ້າງຜູ້ໃຊ້ໃໝ່ດ້ວຍຂໍ້ມູນ:', userData);
       
-      // Call API to create user
+      // Create user via API
       const response = await userService.createUser(userData);
-      console.log('User creation response:', response);
+      console.log('ສ້າງຜູ້ໃຊ້ໃໝ່ສຳເລັດ, API response:', response);
       
-      // Show success message
-      toast.success('ສ້າງຜູ້ໃຊ້ໃໝ່ສຳເລັດແລ້ວ');
-      
-      // Navigate to users list
-      router.push('/users/list');
-    } catch (error) {
-      console.error('Error creating user:', error);
-      
-      // Log detailed error information
-      if (error.response) {
-        console.error('Error response data:', error.response.data);
-        console.error('Error response status:', error.response.status);
-        console.error('Error response headers:', error.response.headers);
+      // Extract user ID from response - handle different response formats
+      let userId;
+      if (response.data && response.data.id) {
+        userId = response.data.id;
+      } else if (response.data && response.data.data && response.data.data.id) {
+        userId = response.data.data.id;
+      } else {
+        console.warn('User ID not found in response:', response.data);
+        toast.success('ສ້າງຜູ້ໃຊ້ໃໝ່ສຳເລັດແລ້ວ ແຕ່ອາດມີຂໍ້ຜິດພາດໃນການກຳນົດຕຳແໜ່ງ');
+        router.push('/users/list');
+        return;
       }
       
-      // Handle API errors
-      if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
+      // If role is selected, assign it to the user
+      if (formData.role) {
+        try {
+          console.log('ກຳລັງກຳນົດຕຳແໜ່ງຜູ້ໃຊ້:', userId, formData.role);
+          
+          // Set user role via API
+          await userService.changeUserRole(userId, formData.role);
+          console.log('ກຳນົດຕຳແໜ່ງສຳເລັດແລ້ວ');
+          
+          toast.success('ສ້າງຜູ້ໃຊ້ ແລະ ກຳນົດຕຳແໜ່ງສຳເລັດແລ້ວ');
+        } catch (roleError) {
+          console.error('ບໍ່ສາມາດກຳນົດຕຳແໜ່ງ:', roleError);
+          toast.warning('ສ້າງຜູ້ໃຊ້ໃໝ່ສຳເລັດແລ້ວ ແຕ່ບໍ່ສາມາດກຳນົດຕຳແໜ່ງໄດ້');
+        }
       } else {
-        toast.error('ເກີດຂໍ້ຜິດພາດໃນການສ້າງຜູ້ໃຊ້ໃໝ່');
+        toast.success('ສ້າງຜູ້ໃຊ້ໃໝ່ສຳເລັດແລ້ວ');
+      }
+      
+      // Navigate back to user list
+      router.push('/users/list');
+    } catch (error) {
+      console.error('ເກີດຂໍ້ຜິດພາດໃນການສ້າງຜູ້ໃຊ້ໃໝ່:', error);
+      
+      // Handle different error response formats
+      if (error.response?.data?.errors) {
+        // Error response contains field-specific errors
+        setErrors(error.response.data.errors);
+      } else if (error.response?.data?.message && Array.isArray(error.response.data.message)) {
+        // NestJS validation error format
+        const validationErrors = {};
+        error.response.data.message.forEach(err => {
+          // Extract field name from error message if possible
+          const field = Object.keys(err.constraints)[0];
+          validationErrors[field] = Object.values(err.constraints)[0];
+        });
+        setErrors(validationErrors);
+        toast.error('ກະລຸນາແກ້ໄຂຂໍ້ມູນທີ່ບໍ່ຖືກຕ້ອງ');
+      } else {
+        // General error message
+        toast.error(error.response?.data?.message || 'ເກີດຂໍ້ຜິດພາດໃນການສ້າງຜູ້ໃຊ້ໃໝ່');
       }
     } finally {
       setIsSubmitting(false);

@@ -1,15 +1,14 @@
 import localFont from "next/font/local";
-import { Toaster } from 'react-hot-toast';
-import { LoadingProvider } from '@/contexts/LoadingContext';
-import { ReactQueryProvider } from '@/providers/ReactQueryProvider';
-import { ApiLoadingHandler } from '@/components/common/ApiLoadingHandler';
-import StoreProvider from '@/components/providers/StoreProvider';
-import ReduxAuthProvider from '@/components/providers/ReduxAuthProvider';
-import dynamic from 'next/dynamic';
+import { Toaster } from "react-hot-toast";
+import { LoadingProvider } from "@/contexts/LoadingContext";
+import { ReactQueryProvider } from "@/providers/ReactQueryProvider";
+import { ApiLoadingHandler } from "@/components/common/ApiLoadingHandler";
+import StoreProvider from "@/components/providers/StoreProvider";
+import ReduxAuthProvider from "@/components/providers/ReduxAuthProvider";
+import dynamic from "next/dynamic";
 import "./globals.css";
 
-// ใช้ dynamic import เพื่อป้องกัน server-side rendering สำหรับส่วนที่ต้องการ client-side เท่านั้น
-const AppInitializer = dynamic(() => import('@/app/app-init'), { ssr: false });
+const AppInitializer = dynamic(() => import("@/app/app-init"), { ssr: false });
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
