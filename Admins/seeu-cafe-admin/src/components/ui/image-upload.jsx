@@ -1,31 +1,29 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState } from "react";
 
 const ImageUpload = ({ value, onChange, className = "" }) => {
   const inputRef = useRef(null);
+
   const [preview, setPreview] = useState(value);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-        onChange(reader.result);
-      };
-      reader.readAsDataURL(file);
+      const previewUrl = URL.createObjectURL(file);
+      setPreview(previewUrl);
+      onChange(file);
     }
   };
 
   return (
     <div className={`flex flex-col items-center gap-4 ${className}`}>
-      <div 
+      <div
         className="w-full aspect-video bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 hover:border-gray-400 cursor-pointer"
         onClick={() => inputRef.current?.click()}
       >
         {preview ? (
-          <img 
-            src={preview} 
-            alt="Preview" 
+          <img
+            src={preview}
+            alt="Preview"
             className="w-full h-full object-cover"
           />
         ) : (
@@ -50,6 +48,11 @@ const ImageUpload = ({ value, onChange, className = "" }) => {
             e.stopPropagation();
             setPreview(null);
             onChange(null);
+
+            // Clean up the object URL to prevent memory leaks
+            if (preview && preview.startsWith("blob:")) {
+              URL.revokeObjectURL(preview);
+            }
           }}
         >
           Remove image

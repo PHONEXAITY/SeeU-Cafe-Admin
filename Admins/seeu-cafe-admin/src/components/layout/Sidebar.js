@@ -798,6 +798,7 @@ const UltraResponsiveCafeSidebar = ({ sidebarOpen: externalSidebarOpen, setSideb
                     alt="SeeU Cafe Logo"
                     width={54}
                     height={54}
+                    priority
                     className="object-contain"
                   />
                   

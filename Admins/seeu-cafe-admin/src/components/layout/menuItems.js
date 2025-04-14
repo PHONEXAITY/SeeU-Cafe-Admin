@@ -1,6 +1,6 @@
 import {
     FaHome, FaShoppingCart, FaUsers, FaTruck, FaChartBar, FaBell, FaCog, FaBlog,
-    FaPercent, FaImages, FaPlayCircle, FaUserCircle, FaClipboardList, FaStar, FaUserTie, FaBox
+    FaPercent, FaImages, FaPlayCircle, FaUserCircle, FaClipboardList, FaStar, FaUserTie, FaBox, FaTable
   } from 'react-icons/fa';
   
   export const menuItems = [
@@ -14,7 +14,7 @@ import {
         { href: "/Orders/create", text: "ສ້າງລາຍການສັ່ງຊື້ໃໝ່" },
         { href: "/Orders/history", text: "ປະຫວັດການສັ່ງຊື້" }
       ],
-      roleRequired: 'staff'
+      roleRequired: 'admin'
     },
     {
       id: 'users',
@@ -37,7 +37,7 @@ import {
       ],
       roleRequired: 'admin'
     },
-    {
+/*     {
       id: 'shipping',
       icon: <FaTruck className="w-5 h-5" />,
       text: "ການຈັດສົ່ງ",
@@ -45,6 +45,29 @@ import {
         { href: "/shipping/orders", text: "ການຈັດສົ່ງລາຍການສັ່ງຊື້" },
         { href: "/shipping/tracking", text: "ການຕິດຕາມ" },
         { href: "/shipping/carriers", text: "ຜູ້ໃຫ້ບໍລິການ" }
+      ],
+      roleRequired: 'admin'
+    }, */
+    {
+      id: 'deliveries',
+      icon: <FaTruck className="w-5 h-5" />,
+      text: "ການຈັດສົ່ງ",
+      subItems: [
+        { href: "/deliveries/list", text: "ການຈັດສົ່ງລາຍການສັ່ງຊື້" },
+        { href: "/deliveries/create", text: "ສ້າງການຈັດສົ່ງໃໝ່" },
+        { href: "/deliveries/tracking", text: "ຕິດຕາມການຈັດສົ່ງ" },
+        { href: "/deliveries/history", text: "ປະຫວັດການຈັດສົ່ງ" }
+
+      ],
+      roleRequired: 'admin'
+    },
+    {
+      id: 'tables',
+      icon: <FaTable className="w-5 h-5" />,
+      text: "ຈັດການໂຕະ",
+      subItems: [
+        { href: "/tables", text: "ລາຍການໂຕະ" },
+        { href: "/tables/add", text: "ເພີ່ມໂຕະໃໝ່" }
       ],
       roleRequired: 'admin'
     },
@@ -55,8 +78,7 @@ import {
       subItems: [
         { href: "/employees/list", text: "ລາຍຊື່ພະນັກງານ" },
         { href: "/employees/create", text: "ເພີ່ມພະນັກງານໃໝ່" },
-        { href: "/employees/schedule", text: "ຕາຕະລາງເຮັດວຽກ" },
-        { href: "/employees/attendance", text: "ການຂາດ, ລາ, ມາສາຍ" }
+        { href: "/documents", text: "ເອກະສານ" },
       ],
       roleRequired: 'admin'
     },
@@ -150,8 +172,7 @@ import {
       text: "ຄັງຮູບພາບ",
       subItems: [
         { href: "/gallery/all", text: "ຮູບພາບທັງໝົດ" },
-        { href: "/gallery/upload", text: "ອັບໂຫລດ ຮູບພາບ" },
-        { href: "/gallery/albums", text: "Albums" }
+        { href: "/gallery/upload", text: "ອັບໂຫລດ ຮູບພາບ" }
       ],
       roleRequired: 'admin'
     },

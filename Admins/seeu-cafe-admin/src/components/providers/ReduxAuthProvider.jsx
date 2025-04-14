@@ -52,7 +52,6 @@ const ReduxAuthProvider = ({ children }) => {
   }, [dispatch, isInitialized]);
 
   useEffect(() => {
-    console.log("ReduxAuthProvider state:", { isInitialized, isAuthenticated });
   }, [isInitialized, isAuthenticated]);
 
   if (!isInitialized) {

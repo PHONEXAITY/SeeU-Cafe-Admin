@@ -1,11 +1,11 @@
 
-import CreateEmployee from '@/components/Employees/CreateEmployee';
+import EmployeeForm from '@/components/Employees/EmployeeForm';
 import Layout from '@/components/layout/Layout';
 
 export default function CreateEmployeeRoute() {
   return (
     <Layout>
-      <CreateEmployee />
+      <EmployeeForm />
     </Layout>
   );
 }
