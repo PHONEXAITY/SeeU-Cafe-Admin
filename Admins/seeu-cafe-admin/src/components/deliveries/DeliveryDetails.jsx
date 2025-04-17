@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useDelivery } from "@/hooks/useDelivery";
-import { format } from "date-fns";
-import { formatDate } from "@/utils/dateFormatter";
+import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import {
   Dialog,
   DialogPortal,
@@ -17,19 +16,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Label } from "../ui/labels";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectGroup,
   SelectValue,
   SelectTrigger,
   SelectContent,
-  SelectLabel,
   SelectItem,
-  SelectSeparator,
-  SelectScrollUpButton,
-  SelectScrollDownButton,
-} from "../ui/select";
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -45,6 +40,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChevronLeft,
   Truck,
@@ -61,38 +57,57 @@ import {
   Calendar,
   Loader2,
   ExternalLink,
+  ArrowUpRight,
+  X,
+  RefreshCw,
+  Clipboard,
+  MessageSquare,
+  ShoppingBag,
+  Ban,
 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
-// คอมโพเนนต์แสดงสถานะ
-const StatusBadge = ({ status }) => {
-  const statusColors = {
-    pending: {
-      bg: "bg-yellow-100",
-      text: "text-yellow-800",
-      border: "border-yellow-200",
-    },
-    preparing: {
-      bg: "bg-blue-100",
-      text: "text-blue-800",
-      border: "border-blue-200",
-    },
-    out_for_delivery: {
-      bg: "bg-purple-100",
-      text: "text-purple-800",
-      border: "border-purple-200",
-    },
-    delivered: {
-      bg: "bg-green-100",
-      text: "text-green-800",
-      border: "border-green-200",
-    },
-    cancelled: {
-      bg: "bg-red-100",
-      text: "text-red-800",
-      border: "border-red-200",
-    },
-  };
+// Status color configurations
+const statusConfigs = {
+  pending: {
+    bg: "bg-yellow-100",
+    text: "text-yellow-800",
+    border: "border-yellow-200",
+    icon: <Clock className="h-4 w-4 text-yellow-600" />,
+    iconLarge: <Clock className="h-5 w-5 text-yellow-600" />,
+  },
+  preparing: {
+    bg: "bg-blue-100",
+    text: "text-blue-800",
+    border: "border-blue-200",
+    icon: <Package className="h-4 w-4 text-blue-600" />,
+    iconLarge: <Package className="h-5 w-5 text-blue-600" />,
+  },
+  out_for_delivery: {
+    bg: "bg-purple-100",
+    text: "text-purple-800",
+    border: "border-purple-200",
+    icon: <Truck className="h-4 w-4 text-purple-600" />,
+    iconLarge: <Truck className="h-5 w-5 text-purple-600" />,
+  },
+  delivered: {
+    bg: "bg-green-100",
+    text: "text-green-800",
+    border: "border-green-200",
+    icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+    iconLarge: <CheckCircle className="h-5 w-5 text-green-600" />,
+  },
+  cancelled: {
+    bg: "bg-red-100",
+    text: "text-red-800",
+    border: "border-red-200",
+    icon: <X className="h-4 w-4 text-red-600" />,
+    iconLarge: <Ban className="h-5 w-5 text-red-600" />,
+  },
+};
 
+// Status translations 
+const translateStatus = (status) => {
   const translations = {
     pending: "ລໍຖ້າ",
     preparing: "ກຳລັງກະກຽມ",
@@ -100,31 +115,54 @@ const StatusBadge = ({ status }) => {
     delivered: "ສົ່ງແລ້ວ",
     cancelled: "ຍົກເລີກ",
   };
+  return translations[status] || status;
+};
 
-  const statusConfig = statusColors[status] || statusColors.pending;
-
+// Status badge component
+const StatusBadge = ({ status, size = "md" }) => {
+  const statusConfig = statusConfigs[status] || statusConfigs.pending;
+  
   return (
-    <Badge
-      variant="outline"
-      className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+    <Badge 
+      variant="outline" 
+      className={`flex items-center gap-1 ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border} ${
+        size === "lg" ? "px-3 py-1.5 text-sm" : "px-2 py-0.5 text-xs"
+      }`}
     >
-      {translations[status] || status}
+      {size === "lg" ? statusConfig.iconLarge : statusConfig.icon}
+      <span>{translateStatus(status)}</span>
     </Badge>
   );
 };
 
-// คอมโพเนนต์แสดงข้อมูลการจัดส่ง
+// Format date with contextual display
+const formatDateDisplay = (dateString) => {
+  if (!dateString) return "ບໍ່ມີຂໍ້ມູນ";
+  
+  const date = new Date(dateString);
+  
+  if (isToday(date)) {
+    return `ມື້ນີ້ ${format(date, 'HH:mm')}`;
+  } else if (isYesterday(date)) {
+    return `ມື້ວານນີ້ ${format(date, 'HH:mm')}`;
+  } else {
+    return format(date, 'dd/MM/yyyy HH:mm');
+  }
+};
+
+// Delivery info section
 const DeliveryInfo = ({ delivery }) => {
   if (!delivery) return null;
+  
+  const { toast } = useToast();
 
-  // ฟอร์แมตวันที่เวลา
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "ບໍ່ມີຂໍ້ມູນ";
-    try {
-      return format(new Date(dateStr), "dd/MM/yyyy HH:mm");
-    } catch (error) {
-      return dateStr;
-    }
+  const copyToClipboard = (text, message) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        description: message,
+        duration: 2000,
+      });
+    });
   };
 
   return (
@@ -133,11 +171,19 @@ const DeliveryInfo = ({ delivery }) => {
         <h3 className="text-sm font-medium text-gray-500 mb-2">
           ທີ່ຢູ່ຈັດສົ່ງ
         </h3>
-        <div className="flex gap-2 items-start">
+        <div className="flex gap-2 items-start group">
           <MapPin className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-          <p className="text-gray-900">
-            {delivery.delivery_address || "ບໍ່ມີຂໍ້ມູນທີ່ຢູ່"}
-          </p>
+          <div className="flex-1">
+            <p className="text-gray-900">{delivery.delivery_address || "ບໍ່ມີຂໍ້ມູນທີ່ຢູ່"}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-primary hover:text-primary/80 p-0 h-auto mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => copyToClipboard(delivery.delivery_address, "ສຳເນົາທີ່ຢູ່ແລ້ວ")}
+            >
+              <Clipboard className="h-3 w-3 mr-1" /> ສຳເນົາທີ່ຢູ່
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -146,14 +192,54 @@ const DeliveryInfo = ({ delivery }) => {
           ຂໍ້ມູນການຕິດຕໍ່
         </h3>
         {delivery.phone_number ? (
-          <div className="flex gap-2 mb-2 items-center">
+          <div className="flex gap-2 mb-2 items-center group">
             <Phone className="h-5 w-5 text-gray-400 flex-shrink-0" />
-            <p className="text-gray-900">{delivery.phone_number}</p>
+            <div className="flex-1">
+              <p className="text-gray-900">{delivery.phone_number}</p>
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary hover:text-primary/80 p-0 h-auto"
+                  onClick={() => copyToClipboard(delivery.phone_number, "ສຳເນົາເບີໂທແລ້ວ")}
+                >
+                  <Clipboard className="h-3 w-3 mr-1" /> ສຳເນົາ
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-green-600 hover:text-green-700 p-0 h-auto"
+                  onClick={() => window.location.href = `tel:${delivery.phone_number}`}
+                >
+                  <Phone className="h-3 w-3 mr-1" /> ໂທຫາ
+                </Button>
+              </div>
+            </div>
           </div>
         ) : delivery.order?.user?.phone ? (
-          <div className="flex gap-2 mb-2 items-center">
+          <div className="flex gap-2 mb-2 items-center group">
             <Phone className="h-5 w-5 text-gray-400 flex-shrink-0" />
-            <p className="text-gray-900">{delivery.order.user.phone}</p>
+            <div className="flex-1">
+              <p className="text-gray-900">{delivery.order.user.phone}</p>
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary hover:text-primary/80 p-0 h-auto"
+                  onClick={() => copyToClipboard(delivery.order.user.phone, "ສຳເນົາເບີໂທແລ້ວ")}
+                >
+                  <Clipboard className="h-3 w-3 mr-1" /> ສຳເນົາ
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-green-600 hover:text-green-700 p-0 h-auto"
+                  onClick={() => window.location.href = `tel:${delivery.order.user.phone}`}
+                >
+                  <Phone className="h-3 w-3 mr-1" /> ໂທຫາ
+                </Button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex gap-2 mb-2 items-center text-gray-500">
@@ -163,9 +249,29 @@ const DeliveryInfo = ({ delivery }) => {
         )}
 
         {delivery.order?.user?.email && (
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center group">
             <Mail className="h-5 w-5 text-gray-400 flex-shrink-0" />
-            <p className="text-gray-900">{delivery.order.user.email}</p>
+            <div className="flex-1">
+              <p className="text-gray-900">{delivery.order.user.email}</p>
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary hover:text-primary/80 p-0 h-auto"
+                  onClick={() => copyToClipboard(delivery.order.user.email, "ສຳເນົາອີເມລແລ້ວ")}
+                >
+                  <Clipboard className="h-3 w-3 mr-1" /> ສຳເນົາ
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-blue-600 hover:text-blue-700 p-0 h-auto"
+                  onClick={() => window.location.href = `mailto:${delivery.order.user.email}`}
+                >
+                  <Mail className="h-3 w-3 mr-1" /> ສົ່ງອີເມລ
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -177,7 +283,7 @@ const DeliveryInfo = ({ delivery }) => {
             <Calendar className="h-5 w-5 text-gray-400 flex-shrink-0" />
             <div>
               <p className="text-xs text-gray-500">ວັນທີ່ສ້າງ:</p>
-              <p className="text-gray-900">{formatDate(delivery.created_at)}</p>
+              <p className="text-gray-900">{formatDateDisplay(delivery.created_at)}</p>
             </div>
           </div>
 
@@ -187,8 +293,8 @@ const DeliveryInfo = ({ delivery }) => {
               <p className="text-xs text-gray-500">ເວລາຈັດສົ່ງໂດຍປະມານ:</p>
               <p className="text-gray-900">
                 {delivery.estimated_delivery_time
-                  ? formatDate(delivery.estimated_delivery_time)
-                  : "ບໍ່ໄດ້ກຳນົດ"}
+                  ? formatDateDisplay(delivery.estimated_delivery_time)
+                  : <span className="text-gray-500 italic">ບໍ່ໄດ້ກຳນົດ</span>}
               </p>
             </div>
           </div>
@@ -199,7 +305,7 @@ const DeliveryInfo = ({ delivery }) => {
               <div>
                 <p className="text-xs text-gray-500">ຮັບຈາກຮ້ານ:</p>
                 <p className="text-gray-900">
-                  {formatDate(delivery.pickup_from_kitchen_time)}
+                  {formatDateDisplay(delivery.pickup_from_kitchen_time)}
                 </p>
               </div>
             </div>
@@ -211,7 +317,7 @@ const DeliveryInfo = ({ delivery }) => {
               <div>
                 <p className="text-xs text-gray-500">ສົ່ງສຳເລັດ:</p>
                 <p className="text-gray-900">
-                  {formatDate(delivery.actual_delivery_time)}
+                  {formatDateDisplay(delivery.actual_delivery_time)}
                 </p>
               </div>
             </div>
@@ -225,32 +331,43 @@ const DeliveryInfo = ({ delivery }) => {
         </h3>
         {delivery.employee ? (
           <div className="flex items-center gap-3">
-            <Avatar>
+            <Avatar className="border border-primary/20">
               {delivery.employee.profile_photo ? (
                 <AvatarImage
                   src={delivery.employee.profile_photo}
                   alt={`${delivery.employee.first_name} ${delivery.employee.last_name}`}
                 />
               ) : null}
-              <AvatarFallback className="bg-primary text-primary-foreground">
+              <AvatarFallback className="bg-primary/10 text-primary">
                 {delivery.employee.first_name?.charAt(0)}
                 {delivery.employee.last_name?.charAt(0)}
               </AvatarFallback>
             </Avatar>
 
             <div>
-              <p className="font-medium">
+              <p className="font-medium text-gray-900">
                 {delivery.employee.first_name} {delivery.employee.last_name}
               </p>
               {delivery.employee.phone && (
-                <p className="text-sm text-gray-500">
-                  {delivery.employee.phone}
-                </p>
+                <div className="flex gap-2 items-center mt-1">
+                  <p className="text-sm text-gray-500">
+                    {delivery.employee.phone}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 rounded-full bg-green-50 hover:bg-green-100 text-green-600"
+                    title="ໂທຫາຄົນຂັບລົດ"
+                    onClick={() => window.location.href = `tel:${delivery.employee.phone}`}
+                  >
+                    <Phone className="h-3 w-3" />
+                  </Button>
+                </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="flex items-center text-gray-500">
+          <div className="flex items-center text-gray-500 p-2 bg-gray-50 rounded-md">
             <User className="h-5 w-5 mr-2 text-gray-400" />
             <p>ບໍ່ໄດ້ມອບໝາຍຄົນຂັບລົດ</p>
           </div>
@@ -262,118 +379,130 @@ const DeliveryInfo = ({ delivery }) => {
           <h3 className="text-sm font-medium text-gray-500 mb-2">
             ໝາຍເຫດຈາກລູກຄ້າ
           </h3>
-          <div className="p-3 bg-gray-50 rounded-md text-gray-700">
-            {delivery.customer_note}
+          <div className="p-3 bg-gray-50 rounded-md text-gray-700 border border-gray-100">
+            <div className="flex items-start">
+              <MessageSquare className="h-4 w-4 text-gray-400 mt-0.5 mr-2 flex-shrink-0" />
+              <p>{delivery.customer_note}</p>
+            </div>
           </div>
         </div>
       )}
 
-      {delivery.delivery_fee !== null &&
-        delivery.delivery_fee !== undefined && (
-          <div className="md:col-span-2">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">
-              ຄ່າຈັດສົ່ງ
-            </h3>
-            <p className="text-xl font-semibold text-primary">
-              ₭{Number(delivery.delivery_fee).toLocaleString()}
-            </p>
-          </div>
-        )}
+      {delivery.delivery_fee !== null && delivery.delivery_fee !== undefined && (
+        <div className="md:col-span-2">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">
+            ຄ່າຈັດສົ່ງ
+          </h3>
+          <p className="text-xl font-semibold text-primary">
+            ₭{Number(delivery.delivery_fee).toLocaleString()}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
-// คอมโพเนนต์แสดงข้อมูลออเดอร์
+// Order details component
 const OrderDetails = ({ order }) => {
   if (!order) {
     return (
-      <div className="text-center py-4">
+      <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-100">
         <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-        <p className="text-gray-600">ບໍ່ພົບຂໍ້ມູນອໍເດີ</p>
+        <p className="text-gray-600 font-medium">ບໍ່ພົບຂໍ້ມູນອໍເດີ</p>
+        <p className="text-gray-500 text-sm mt-1">ອໍເດີນີ້ອາດຈະຖືກລຶບອອກຈາກລະບົບແລ້ວ</p>
       </div>
     );
   }
 
   const subtotal =
     order.order_details?.reduce(
-      (sum, item) => sum + item.price * item.quantity,
+      (sum, item) => sum + Number(item.price) * Number(item.quantity),
       0
     ) || 0;
 
   return (
     <div>
       {order.order_details && order.order_details.length > 0 ? (
-        <div className="divide-y">
+        <div className="divide-y divide-gray-100">
           {order.order_details.map((item) => (
             <div key={item.id} className="py-3 flex justify-between">
               <div>
-                <p className="font-medium">
-                  {item.quantity} ×{" "}
-                  {item.food_menu?.name ||
-                    item.beverage_menu?.name ||
-                    "ສິນຄ້າໄດ້ຖືກລຶບແລ້ວ"}
+                <p className="font-medium text-gray-900 flex items-start">
+                  <span className="bg-primary/10 text-primary rounded-md px-1.5 py-0.5 text-xs font-semibold mr-2">
+                    {item.quantity}×
+                  </span>
+                  <span>
+                    {item.food_menu?.name ||
+                      item.beverage_menu?.name ||
+                      "ສິນຄ້າໄດ້ຖືກລຶບແລ້ວ"}
+                  </span>
                 </p>
                 {item.notes && (
-                  <p className="text-sm text-gray-500 mt-1">{item.notes}</p>
+                  <p className="text-sm text-gray-500 mt-1 ml-8">{item.notes}</p>
                 )}
               </div>
-              <p className="font-medium">
+              <p className="font-medium text-gray-900">
                 ₭{Number(item.price).toLocaleString()}
               </p>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 text-center py-3">ບໍ່ມີລາຍການສິນຄ້າ</p>
+        <div className="text-center py-4 bg-gray-50 rounded-lg">
+          <p className="text-gray-500">ບໍ່ມີລາຍການສິນຄ້າ</p>
+        </div>
       )}
 
       <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className="flex justify-between py-1">
-          <p className="text-gray-600">ລວມລາຄາສິນຄ້າ</p>
-          <p className="font-medium">₭{subtotal.toLocaleString()}</p>
+        <div className="flex justify-between py-1 text-gray-600">
+          <p>ລວມລາຄາສິນຄ້າ</p>
+          <p className="font-medium text-gray-800">₭{subtotal.toLocaleString()}</p>
         </div>
-        <div className="flex justify-between py-1">
-          <p className="text-gray-600">ຄ່າຈັດສົ່ງ</p>
-          <p className="font-medium">
+        <div className="flex justify-between py-1 text-gray-600">
+          <p>ຄ່າຈັດສົ່ງ</p>
+          <p className="font-medium text-gray-800">
             ₭{Number(order.delivery_fee || 0).toLocaleString()}
           </p>
         </div>
         {order.discount_amount > 0 && (
-          <div className="flex justify-between py-1">
-            <p className="text-gray-600">ສ່ວນຫຼຸດ</p>
+          <div className="flex justify-between py-1 text-gray-600">
+            <p>ສ່ວນຫຼຸດ</p>
             <p className="font-medium text-green-600">
               -₭{Number(order.discount_amount).toLocaleString()}
             </p>
           </div>
         )}
-        <div className="flex justify-between py-2 text-lg font-bold">
+        <div className="flex justify-between py-2 text-lg font-bold border-t border-gray-200 mt-2 pt-2">
           <p>ລວມທັງໝົດ</p>
-          <p>₭{Number(order.total_price).toLocaleString()}</p>
+          <p className="text-primary">₭{Number(order.total_price).toLocaleString()}</p>
         </div>
       </div>
 
       <div className="mt-6">
         <Button
           variant="outline"
-          className="w-full"
+          className="w-full group hover:bg-gray-50 border-gray-200 hover:border-gray-300 transition-colors"
           onClick={() => window.open(`/orders/${order.id}`, "_blank")}
         >
-          <FileText className="mr-2 h-4 w-4" />
-          ເບິ່ງລາຍລະອຽດອໍເດີເຕັມ
-          <ExternalLink className="ml-2 h-4 w-4" />
+          <FileText className="mr-2 h-4 w-4 text-gray-500 group-hover:text-gray-700" />
+          <span className="text-gray-700 group-hover:text-gray-900">ເບິ່ງລາຍລະອຽດອໍເດີເຕັມ</span>
+          <ExternalLink className="ml-2 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
         </Button>
       </div>
     </div>
   );
 };
 
-// คอมโพเนนต์แสดงไทม์ไลน์สถานะ
+// Status timeline component
 const StatusTimeline = ({ timeline = [] }) => {
   if (!timeline || timeline.length === 0) {
     return (
-      <p className="text-gray-500 text-center py-4">
-        ບໍ່ມີຂໍ້ມູນການອັບເດດສະຖານະ
-      </p>
+      <div className="text-center py-6 bg-gray-50 rounded-lg">
+        <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-gray-500">
+          ບໍ່ມີຂໍ້ມູນການອັບເດດສະຖານະ
+        </p>
+      </div>
     );
   }
 
@@ -396,15 +525,6 @@ const StatusTimeline = ({ timeline = [] }) => {
     delivered: "ສົ່ງແລ້ວ",
     cancelled: "ຍົກເລີກ",
   };
-  // Format date function
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "ບໍ່ມີຂໍ້ມູນ";
-    try {
-      return format(new Date(dateStr), "dd/MM/yyyy HH:mm");
-    } catch (error) {
-      return dateStr;
-    }
-  };
 
   // Sort timeline by latest first
   const sortedTimeline = [...timeline].sort((a, b) => {
@@ -412,27 +532,36 @@ const StatusTimeline = ({ timeline = [] }) => {
   });
 
   return (
-    <div className="relative">
+    <div className="relative pl-4">
       <div className="absolute top-0 bottom-0 left-4 w-0.5 bg-gray-200" />
       {sortedTimeline.map((event, index) => (
-        <div key={index} className="relative flex gap-4 pb-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white z-10 border border-primary">
+        <div key={index} className="relative flex gap-4 pb-6">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-white z-10 border ${
+            event.status === 'delivered' 
+              ? 'border-green-300 text-green-600'
+              : event.status === 'cancelled'
+              ? 'border-red-300 text-red-600'
+              : 'border-primary/30 text-primary'
+          }`}>
             {statusIcons[event.status] || (
-              <Clock className="h-4 w-4 text-gray-500" />
+              <Clock className="h-4 w-4" />
             )}
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col pt-0.5">
             <span className="font-medium text-gray-900">
               {statusLabels[event.status] || event.status}
             </span>
             <time className="text-xs text-gray-500">
-              {formatDate(event.timestamp)}
+              {formatDateDisplay(event.timestamp)}
             </time>
             {event.notes && (
-              <p className="mt-1 text-sm text-gray-600">{event.notes}</p>
+              <p className="mt-1 text-sm text-gray-600 bg-gray-50 p-2 rounded-md border border-gray-100">
+                {event.notes}
+              </p>
             )}
             {event.employee && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1 flex items-center">
+                <User className="h-3 w-3 mr-1 text-gray-400" />
                 ໂດຍ: {event.employee.first_name} {event.employee.last_name}
               </p>
             )}
@@ -443,36 +572,81 @@ const StatusTimeline = ({ timeline = [] }) => {
   );
 };
 
-// คอมโพเนนต์แสดงข้อมูลลูกค้า
+// Customer info component
 const CustomerInfo = ({ user }) => {
   const router = useRouter();
+  const { toast } = useToast();
 
   if (!user) {
-    return <p className="text-gray-500 text-center py-4">ບໍ່ມີຂໍ້ມູນລູກຄ້າ</p>;
+    return (
+      <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-100">
+        <User className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-gray-600 font-medium">ບໍ່ມີຂໍ້ມູນລູກຄ້າ</p>
+      </div>
+    );
   }
+
+  const copyToClipboard = (text, message) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        description: message,
+        duration: 2000,
+      });
+    });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Avatar className="h-12 w-12">
-          <AvatarFallback className="bg-primary text-primary-foreground">
+        <Avatar className="h-14 w-14 border-2 border-primary/10 shadow-sm">
+          <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
             {user.first_name?.charAt(0) || ""}
             {user.last_name?.charAt(0) || ""}
           </AvatarFallback>
         </Avatar>
 
         <div>
-          <p className="font-medium text-lg">
+          <p className="font-medium text-lg text-gray-900">
             {user.first_name} {user.last_name}
           </p>
-          <p className="text-gray-500 text-sm">{user.email}</p>
+          {user.email && (
+            <div className="flex items-center gap-1 group">
+              <p className="text-gray-500 text-sm">{user.email}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-gray-50 hover:bg-gray-100"
+                onClick={() => copyToClipboard(user.email, "ສຳເນົາອີເມລແລ້ວ")}
+              >
+                <Clipboard className="h-3 w-3 text-gray-500" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       {user.phone && (
-        <div className="flex items-center gap-2 text-gray-700">
+        <div className="flex items-center gap-2 text-gray-900 group">
           <Phone className="h-4 w-4 text-gray-400" />
           <span>{user.phone}</span>
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 rounded-full bg-gray-50 hover:bg-gray-100"
+              onClick={() => copyToClipboard(user.phone, "ສຳເນົາເບີໂທແລ້ວ")}
+            >
+              <Clipboard className="h-3 w-3 text-gray-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 rounded-full bg-green-50 hover:bg-green-100 text-green-600"
+              onClick={() => window.location.href = `tel:${user.phone}`}
+            >
+              <Phone className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -485,17 +659,26 @@ const CustomerInfo = ({ user }) => {
 
       <Button
         variant="outline"
-        className="w-full mt-2"
+        className="w-full mt-2 hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-colors"
         onClick={() => router.push(`/customers/${user.id}`)}
       >
         <User className="mr-2 h-4 w-4" />
         ເບິ່ງໂປຣໄຟລລູກຄ້າ
       </Button>
+      
+      <Button
+        variant="ghost"
+        className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+        onClick={() => router.push(`/orders?customer_id=${user.id}`)}
+      >
+        <ShoppingBag className="mr-2 h-4 w-4" />
+        ເບິ່ງປະຫວັດການສັ່ງຊື້
+      </Button>
     </div>
   );
 };
 
-// DialogContent สำหรับอัพเดทสถานะ
+// Dialog for status update
 const StatusUpdateDialog = ({ delivery, onUpdateStatus, open, setOpen }) => {
   const [newStatus, setNewStatus] = useState(delivery?.status || "");
   const [notes, setNotes] = useState("");
@@ -518,7 +701,7 @@ const StatusUpdateDialog = ({ delivery, onUpdateStatus, open, setOpen }) => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>ອັບເດດສະຖານະການຈັດສົ່ງ</DialogTitle>
           <DialogDescription>
@@ -533,15 +716,25 @@ const StatusUpdateDialog = ({ delivery, onUpdateStatus, open, setOpen }) => {
               defaultValue={delivery?.status}
               onValueChange={setNewStatus}
             >
-              <SelectTrigger id="status">
+              <SelectTrigger id="status" className="h-10 border-gray-300 focus:border-primary focus:ring-primary">
                 <SelectValue placeholder="ເລືອກສະຖານະ" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pending">ລໍຖ້າ</SelectItem>
-                <SelectItem value="preparing">ກຳລັງກະກຽມ</SelectItem>
-                <SelectItem value="out_for_delivery">ອອກສົ່ງແລ້ວ</SelectItem>
-                <SelectItem value="delivered">ສົ່ງແລ້ວ</SelectItem>
-                <SelectItem value="cancelled">ຍົກເລີກ</SelectItem>
+                <SelectItem value="pending" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-yellow-500" /> ລໍຖ້າ
+                </SelectItem>
+                <SelectItem value="preparing" className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-blue-500" /> ກຳລັງກະກຽມ
+                </SelectItem>
+                <SelectItem value="out_for_delivery" className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-purple-500" /> ອອກສົ່ງແລ້ວ
+                </SelectItem>
+                <SelectItem value="delivered" className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" /> ສົ່ງແລ້ວ
+                </SelectItem>
+                <SelectItem value="cancelled" className="flex items-center gap-2">
+                  <X className="h-4 w-4 text-red-500" /> ຍົກເລີກ
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -553,15 +746,24 @@ const StatusUpdateDialog = ({ delivery, onUpdateStatus, open, setOpen }) => {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="ເພີ່ມໝາຍເຫດກ່ຽວກັບການປ່ຽນແປງສະຖານະ"
+              className="border-gray-300 focus:border-primary focus:ring-primary min-h-[100px]"
             />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+        <DialogFooter className="flex space-x-2 justify-end">
+          <Button 
+            variant="outline" 
+            onClick={() => setOpen(false)}
+            className="border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
             ຍົກເລີກ
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={submitting}
+            className="bg-primary hover:bg-primary/90"
+          >
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -577,16 +779,15 @@ const StatusUpdateDialog = ({ delivery, onUpdateStatus, open, setOpen }) => {
   );
 };
 
-// หน้าแสดงรายละเอียดการจัดส่ง
+// Main Details Component
 export default function DeliveryDetails() {
   const params = useParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("info");
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  const { delivery, loading, error, updateStatus, fetchDelivery } = useDelivery(
-    params.id
-  );
+  const { delivery, loading, error, updateStatus, fetchDelivery } = useDelivery(params.id);
 
   if (loading) {
     return (
@@ -642,8 +843,25 @@ export default function DeliveryDetails() {
   }
 
   const handleStatusUpdate = async (status, notes) => {
-    await updateStatus(status, notes);
-    await fetchDelivery();
+    try {
+      await updateStatus(status, notes);
+      await fetchDelivery();
+      
+      toast({
+        title: "ສຳເລັດ",
+        description: "ອັບເດດສະຖານະການຈັດສົ່ງສຳເລັດແລ້ວ",
+      });
+      
+      return true;
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "ຂໍ້ຜິດພາດ",
+        description: "ບໍ່ສາມາດອັບເດດສະຖານະການຈັດສົ່ງໄດ້",
+      });
+      
+      return false;
+    }
   };
 
   return (
@@ -658,26 +876,39 @@ export default function DeliveryDetails() {
           >
             <ChevronLeft className="mr-1 h-4 w-4" /> ກັບຄືນ
           </Button>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            ການຈັດສົ່ງ #{delivery.id}
-            <StatusBadge status={delivery.status} />
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900">
+              ການຈັດສົ່ງ #{delivery.id}
+            </h1>
+            <div className="flex items-center mt-1 gap-1 text-sm text-gray-500">
+              <span>ອໍເດີ:</span>
+              <span className="font-medium text-primary">#{delivery.order?.order_id || delivery.order_id}</span>
+              <ArrowUpRight className="h-3 w-3" />
+              <StatusBadge status={delivery.status} />
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setStatusDialogOpen(true)}>
+          <Button 
+            variant="outline" 
+            onClick={() => setStatusDialogOpen(true)}
+            className="bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300 text-gray-700"
+          >
             <Clock className="mr-2 h-4 w-4" /> ອັບເດດສະຖານະ
           </Button>
 
           <Button
             variant="outline"
             onClick={() => router.push(`/deliveries/${delivery.id}/edit`)}
+            className="bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300 text-gray-700"
           >
             <Edit className="mr-2 h-4 w-4" /> ແກ້ໄຂຂໍ້ມູນ
           </Button>
 
           <Button
             onClick={() => router.push(`/deliveries/${delivery.id}/track`)}
+            className="bg-primary hover:bg-primary/90"
           >
             <Truck className="mr-2 h-4 w-4" /> ຕິດຕາມການຈັດສົ່ງ
           </Button>
@@ -691,36 +922,45 @@ export default function DeliveryDetails() {
             onValueChange={setActiveTab}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="info">ຂໍ້ມູນຈັດສົ່ງ</TabsTrigger>
-              <TabsTrigger value="order">ລາຍລະອຽດອໍເດີ</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 bg-gray-100/80 p-1 rounded-lg">
+              <TabsTrigger 
+                value="info" 
+                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                ຂໍ້ມູນຈັດສົ່ງ
+              </TabsTrigger>
+              <TabsTrigger 
+                value="order"
+                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                ລາຍລະອຽດອໍເດີ
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="info" className="border rounded-md mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl">ຂໍ້ມູນການຈັດສົ່ງ</CardTitle>
+            <TabsContent value="info" className="mt-6">
+              <Card className="border border-gray-200 shadow-sm">
+                <CardHeader className="pb-2 border-b border-gray-100">
+                  <CardTitle className="text-xl text-gray-900">ຂໍ້ມູນການຈັດສົ່ງ</CardTitle>
                   <CardDescription>
-                    ອໍເດີ #{delivery.order?.order_id} • ສ້າງວັນທີ:{" "}
-                    {formatDate(delivery.created_at)}
+                    ອໍເດີ #{delivery.order?.order_id || delivery.order_id} • ສ້າງວັນທີ:{" "}
+                    {formatDateDisplay(delivery.created_at)}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   <DeliveryInfo delivery={delivery} />
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="order" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl">ລາຍລະອຽດອໍເດີ</CardTitle>
+              <Card className="border border-gray-200 shadow-sm">
+                <CardHeader className="pb-2 border-b border-gray-100">
+                  <CardTitle className="text-xl text-gray-900">ລາຍລະອຽດອໍເດີ</CardTitle>
                   <CardDescription>
-                    {delivery.order?.order_id &&
-                      `ອໍເດີ #${delivery.order.order_id}`}
+                    {delivery.order?.order_id && `ອໍເດີ #${delivery.order.order_id}`}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   <OrderDetails order={delivery.order} />
                 </CardContent>
               </Card>
@@ -729,27 +969,27 @@ export default function DeliveryDetails() {
         </div>
 
         <div>
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">ສະຖານະການຈັດສົ່ງ</CardTitle>
+          <Card className="mb-6 border border-gray-200 shadow-sm">
+            <CardHeader className="pb-2 border-b border-gray-100">
+              <CardTitle className="text-lg text-gray-900">ສະຖານະການຈັດສົ່ງ</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <StatusTimeline timeline={delivery.order?.timeline} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">ຂໍ້ມູນລູກຄ້າ</CardTitle>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardHeader className="pb-2 border-b border-gray-100">
+              <CardTitle className="text-lg text-gray-900">ຂໍ້ມູນລູກຄ້າ</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <CustomerInfo user={delivery.order?.user} />
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Status Update Dialog */}
       <StatusUpdateDialog
         delivery={delivery}
         onUpdateStatus={handleStatusUpdate}
